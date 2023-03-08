@@ -20,8 +20,8 @@ namespace WorldDirect.CoAP.Example.Client
             {
                 try
                 {
-                    //await DoPut().ConfigureAwait(false);
-                    await DoGet().ConfigureAwait(false);
+                    await DoPut().ConfigureAwait(false);
+                    //await DoGet().ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {

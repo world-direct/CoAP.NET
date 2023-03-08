@@ -302,6 +302,11 @@ namespace WorldDirect.CoAP.Stack
                 BlockwiseStatus status = exchange.RequestBlockStatus;
                 if (!status.Complete)
                 {
+                    if (block1.NUM != status.CurrentNUM)
+                    {
+                        return;
+                    }
+
                     // TODO: the response code should be CONTINUE. Otherwise deliver
                     // Send next block
                     Int32 currentSize = 1 << (4 + status.CurrentSZX);
