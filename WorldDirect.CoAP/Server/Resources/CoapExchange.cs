@@ -39,6 +39,8 @@ namespace WorldDirect.CoAP.Server.Resources
             _resource = resource;
         }
 
+        public Exchange Exchange => this._exchange;
+
         /// <summary>
         /// Gets the request.
         /// </summary>
