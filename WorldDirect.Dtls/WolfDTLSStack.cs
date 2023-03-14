@@ -140,7 +140,7 @@
 
         public async Task HandshakeAsync(CancellationToken ct)
         {
-            
+
             if (this.finishedHandshake)
             {
                 return;
@@ -306,6 +306,7 @@
                     this.logger.LogDebug("New client connected {Remote}", remoteIpEndpoint);
                     session = new WolfDTLSSession(this.socket, remoteIpEndpoint, this.ctx, ct);
                     this.StartSessionAsync(session, this.HandleSessionAsync(session, session.Cts.Token)).ConfigureAwait(false);
+                    this.sessions[remoteIpEndpoint] = session;
                 }
 
                 this.logger.LogTrace("Received {Bytes} bytes from {Remote}", payload.Length, remoteIpEndpoint);
@@ -318,8 +319,9 @@
             while (!ct.IsCancellationRequested)
             {
                 await session.HandshakeAsync(ct);
-                
-                var oldSession = this.sessions.Select(s => s.Value).FirstOrDefault(s => s.client.PublicIdentifier == session.client.PublicIdentifier);
+
+                var oldSession = this.sessions.Select(s => s.Value)
+                    .FirstOrDefault(s => s.client.PublicIdentifier == session.client.PublicIdentifier && s.client.Remote != session.client.Remote);
                 if (oldSession != null)
                 {
                     this.logger.LogDebug("Removing session with {OldRemote} because new client connected with its identity on {Remote}", oldSession.client.Remote, session.client.Remote);
@@ -384,13 +386,18 @@
                     nameof(wolfssl.CTX_use_certificate_file));
                 this.CallErrorAwareCtxFunction(() => wolfssl.CTX_use_PrivateKey_file(this.ctx, this.config.PrivateKeyFile, wolfssl.SSL_FILETYPE_PEM), nameof(wolfssl.CTX_use_PrivateKey_file));
                 this.CallErrorAwareCtxFunction(() => wolfssl.CTX_load_verify_locations(this.ctx, this.config.CAFile, null), nameof(wolfssl.CTX_load_verify_locations));
-                this.CallErrorAwareCtxFunction(() => wolfssl.CTX_set_verify(this.ctx, wolfssl.SSL_VERIFY_FAIL_IF_NO_PEER_CERT | wolfssl.SSL_VERIFY_PEER, (_, _) => wolfssl.SUCCESS), nameof(wolfssl.CTX_set_verify));
+                this.CallErrorAwareCtxFunction(() => wolfssl.CTX_set_verify(this.ctx, wolfssl.SSL_VERIFY_FAIL_IF_NO_PEER_CERT | wolfssl.SSL_VERIFY_PEER, VerifyCertificate), nameof(wolfssl.CTX_set_verify));
             }
             catch (Exception)
             {
                 this.CleanContext();
                 throw;
             }
+        }
+
+        private static int VerifyCertificate(int ret, IntPtr pointer)
+        {
+            return ret;
         }
 
         private void CallErrorAwareCtxFunction(Func<int> functionCall, string name = "")
