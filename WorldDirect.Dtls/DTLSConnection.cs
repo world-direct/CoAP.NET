@@ -13,7 +13,7 @@ internal class DTLSConnection
 
     private bool handshakeCompleted = false;
 
-    public DTLSConnection(DTLSConnectionContext context, int bufferSize = 1024)
+    public DTLSConnection(DTLSConnectionContext context, int bufferSize)
     {
         this.context = context;
         this.bufferSize = bufferSize;
@@ -22,11 +22,8 @@ internal class DTLSConnection
     public IPEndPoint Remote => this.context.Remote;
     public X509Certificate? Certificate => this.context.Certificate;
 
-    public DateTimeOffset LastReceivedTimestamp { get; private set; }
-
     public void HandleInput(Memory<byte> input)
     {
-        this.LastReceivedTimestamp = DateTimeOffset.Now;
         this.context.ReceivedData(input.ToArray());
         if (!this.handshakeCompleted)
         {
@@ -40,13 +37,28 @@ internal class DTLSConnection
 
     public void SendData(byte[] data)
     {
-        this.context.SendData(data);
+        try
+        {
+            this.context.SendData(data);
+        }
+        catch (Exception ex)
+        {
+            this.OnErrorOccured("Could not send data", ex);
+        }
     }
 
     private void ReadData()
     {
         var buffer = new byte[this.bufferSize];
-        var ret = this.context.TryReadData(buffer);
+        int ret = 0;
+        try
+        {
+            ret = this.context.TryReadData(buffer);
+        }
+        catch (Exception ex)
+        {
+            this.OnErrorOccured("Could not read data", ex);
+        }
         if (ret > 0)
         {
             this.Received?.Invoke(this, new ReceivedDataEventArgs() {Bytes = buffer.Take(ret).ToArray(),});
@@ -75,9 +87,6 @@ internal class DTLSConnection
 
     private void OnErrorOccured(string message, Exception? e = null)
     {
-        this.ErrorOccured?.Invoke(this, new DTLSErrorEventArgs()
-        {
-
-        });
+        this.ErrorOccured?.Invoke(this, new DTLSErrorEventArgs(message, e));
     }
 }

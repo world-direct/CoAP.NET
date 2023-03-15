@@ -22,12 +22,13 @@
         private Socket? socket;
         private Task? receivingTask;
         private bool isRunning;
-        private Dictionary<IPEndPoint, DTLSConnection> connections = new();
+        private readonly IMemoryCache cache;
 
-        public DTLSManager(DTLSConfig config,ILogger<DTLSManager> logger)
+        public DTLSManager(DTLSConfig config, IMemoryCache cache, ILogger<DTLSManager> logger)
         {
             this.config = config;
             this.logger = logger;
+            this.cache = cache;
         }
 
         public event EventHandler<DTLSDecryptedDataReceivedEventArgs>? ReceivedData;
@@ -70,7 +71,7 @@
 
         public void SendTo(byte[] message, IPEndPoint remote)
         {
-            if (this.connections.TryGetValue(remote, out var connection))
+            if (this.cache.TryGetValue<DTLSConnection>(remote, out var connection))
             {
                 connection.SendData(message);
             }
@@ -112,16 +113,26 @@
                 }
                 var ipEndpoint = (IPEndPoint)receiveResult.RemoteEndPoint;
 
-                if(!this.connections.TryGetValue(ipEndpoint, out var connection))
+                var connection = this.cache.GetOrCreate(ipEndpoint, entry =>
                 {
+                    entry.SlidingExpiration = this.config.Timeout;
+                    entry.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration()
+                    {
+                        EvictionCallback = (key, value, reason, state) =>
+                        {
+                            var rem = (IPEndPoint)key;
+                            this.logger.LogDebug("Removed DTLS Connection to {Remote} because of timeout", rem);
+                        },
+                        State = this,
+                    });
                     var connectionContext = this.context.CreateConnectionContext(ipEndpoint);
-                    connection = new DTLSConnection(connectionContext);
-                    connection.ErrorOccured += OnErrorOccured;
-                    connection.HandshakeCompleted += OnHandshakeCompleted;
-                    connection.Received += OnDataReceived;
-                    this.connections.Add(ipEndpoint, connection);
+                    var conn = new DTLSConnection(connectionContext, this.config.BufferSize);
+                    conn.ErrorOccured += OnErrorOccured;
+                    conn.HandshakeCompleted += OnHandshakeCompleted;
+                    conn.Received += OnDataReceived;
                     this.logger.LogDebug("Created new dtls connection with {Remote}", ipEndpoint);
-                }
+                    return conn;
+                });
 
                 var input = new Memory<byte>(rxBuffer, 0, receiveResult.ReceivedBytes);
                 this.logger.LogTrace("Received {Bytes} bytes from {Remote}", input.Length, ipEndpoint);
@@ -156,7 +167,7 @@
             var connection = (DTLSConnection)sender;
             var dtlsClient = new DTLSClient(connection.Remote);
             dtlsClient.Certificate = connection.Certificate;
-            dtlsClient.PublicIdentifier = connection.Certificate.Subject;
+            dtlsClient.PublicIdentifier = connection.Certificate.GetCommonName();
             this.ReceivedData?.Invoke(this, new DTLSDecryptedDataReceivedEventArgs(dtlsClient, e.Bytes));
         }
 
@@ -165,13 +176,12 @@
             var connection = (DTLSConnection)sender;
             if (e.Success)
             {
-                // todo remove old connections with same certificate
                 this.logger.LogDebug("Handshake completed {HandshakeResult} with {Remote}", "successfully", connection.Remote);
             }
             else
             {
                 this.logger.LogDebug("Handshake {HandshakeResult} with {Remote}", "failed", connection.Remote);
-                this.connections.Remove(connection.Remote);
+                this.cache.Remove(connection.Remote);
             }
             
         }
@@ -179,9 +189,16 @@
         private void OnErrorOccured(object? sender, DTLSErrorEventArgs e)
         {
             var connection = (DTLSConnection)sender;
-            // todo error messages
-            this.logger.LogError("DTLSConnection with {Remote} was closed because of error.", connection.Remote);
-            this.connections.Remove(connection.Remote);
+            if (e.Exception != null)
+            {
+                this.logger.LogError(e.Exception, "DTLSConnection with {Remote} was closed because of '{Message}'.", connection.Remote, e.Message);
+            }
+            else
+            {
+                this.logger.LogError(e.Exception, "DTLSConnection with {Remote} was closed because of '{Message}'.", connection.Remote, e.Message);
+            }
+            
+            this.cache.Remove(connection.Remote);
         }
     }
 }

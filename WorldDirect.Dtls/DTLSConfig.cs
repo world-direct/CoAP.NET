@@ -8,6 +8,7 @@
         public string CAFile { get; set; }
 
         public int BufferSize { get; set; }
+        public TimeSpan Timeout { get; set; }
     }
 }
 
