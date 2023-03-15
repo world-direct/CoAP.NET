@@ -43,9 +43,8 @@ namespace WorldDirect.Dtls {
         /// </summary>
         internal class DTLS_con
         {
-            public Socket udp;
-            public IPEndPoint ep;
-            public WolfDTLSSession session;
+            public SendDTLSDataContext SendContext;
+            public DTLSConnectionContext ConnectionContext;
         }
 
 
@@ -562,7 +561,7 @@ namespace WorldDirect.Dtls {
 
                 Byte[] msg = new Byte[sz];
                 Marshal.Copy(buf, msg, 0, sz);
-                con.udp.SendTo(msg, con.ep);
+                con.SendContext.SendData(msg, con.ConnectionContext.Remote);
                 return msg.Length;
             }
             catch (Exception e)
@@ -594,7 +593,7 @@ namespace WorldDirect.Dtls {
                 System.Runtime.InteropServices.GCHandle gch;
                 gch = GCHandle.FromIntPtr(ctx);
                 DTLS_con con = (DTLS_con)gch.Target;
-                if (!con.session.TryDequeueReceivedData(out var msg))
+                if (!con.ConnectionContext.TryDequeueData(out var msg))
                 {
                     return wolfssl.CBIO_ERR_WANT_READ;
                 }
@@ -1274,7 +1273,7 @@ namespace WorldDirect.Dtls {
         /// <param name="udp">UDP object to send and receive</param>
         /// <param name="ep">End point of connection</param>
         /// <returns>1 on success</returns>
-        internal static int set_dtls_fd(IntPtr ssl, Socket udp, IPEndPoint ep, WolfDTLSSession session)
+        internal static int set_dtls_fd(IntPtr ssl, SendDTLSDataContext sendContext, DTLSConnectionContext connContext)
         {
             /* sanity check on inputs */
             if (ssl == IntPtr.Zero)
@@ -1293,9 +1292,8 @@ namespace WorldDirect.Dtls {
                     GCHandle fd_pin;
 
                     con = new DTLS_con();
-                    con.udp = udp;
-                    con.ep = ep;
-                    con.session = session;
+                    con.SendContext = sendContext;
+                    con.ConnectionContext = connContext;
                     fd_pin = GCHandle.Alloc(con);
                     handles.set_fd(fd_pin);
                     ptr = GCHandle.ToIntPtr(fd_pin);
