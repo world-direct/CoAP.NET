@@ -166,7 +166,6 @@ namespace WorldDirect.CoAP.Net
         {
             if (Running)
                 Stop();
-            _dtlsStack.Dispose();
             IDisposable d = _matcher as IDisposable;
             if (d != null)
                 d.Dispose();

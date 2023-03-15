@@ -2,25 +2,14 @@
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Net;
     using System.Net.Http.Headers;
     using System.Net.Sockets;
-    using System.Security.Cryptography.X509Certificates;
     using System.Text;
     using System.Threading.Tasks;
     using CoAP.Net;
+    using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
-
-    public class DTLSConfig
-    {
-        public ushort Port { get; set; }
-        public string CertificateFile { get; set; }
-        public string PrivateKeyFile { get; set; }
-        public string CAFile { get; set; }
-
-        public int BufferSize { get; set; }
-    }
 
     public class DTLSManager : IDTLSStack
     {
@@ -35,15 +24,10 @@
         private bool isRunning;
         private Dictionary<IPEndPoint, DTLSConnection> connections = new();
 
-        public DTLSManager(DTLSConfig config, ILogger<DTLSManager> logger)
+        public DTLSManager(DTLSConfig config,ILogger<DTLSManager> logger)
         {
             this.config = config;
             this.logger = logger;
-        }
-
-        public void Dispose()
-        {
-            throw new NotImplementedException();
         }
 
         public event EventHandler<DTLSDecryptedDataReceivedEventArgs>? ReceivedData;
@@ -198,277 +182,6 @@
             // todo error messages
             this.logger.LogError("DTLSConnection with {Remote} was closed because of error.", connection.Remote);
             this.connections.Remove(connection.Remote);
-        }
-    }
-
-    internal class SendDTLSDataContext
-    {
-        private Action<Memory<byte>, IPEndPoint> sendCallback;
-
-        public SendDTLSDataContext(Action<Memory<byte>, IPEndPoint> callback)
-        {
-            this.sendCallback = callback;
-        }
-
-        public void SendData(Memory<byte> data, IPEndPoint endpoint)
-        {
-            this.sendCallback(data, endpoint);
-        }
-    }
-
-    internal class DTLSContext
-    {
-        private IntPtr ctx;
-        private SendDTLSDataContext sendContext;
-
-        public DTLSContext()
-        {
-            this.ctx = wolfssl.CTX_dtls_new(wolfssl.useDTLSv1_2_server());
-            if (this.ctx == IntPtr.Zero)
-            {
-                throw new InvalidOperationException("Cant create new DTLS context");
-            }
-        }
-
-        public void SetSendCallback(Action<Memory<byte>, IPEndPoint> callback)
-        {
-            this.sendContext = new SendDTLSDataContext(callback);
-        }
-
-        public void SetCertificateFile(string path)
-        {
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException($"{path} for certificate does not exist");
-            }
-            this.CallErrorAwareCtxFunction(() => wolfssl.CTX_use_certificate_file(this.ctx, path, wolfssl.SSL_FILETYPE_PEM),
-                nameof(wolfssl.CTX_use_certificate_file));
-        }
-
-        public void SetPrivateKeyFile(string path)
-        {
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException($"{path} for private key does not exist");
-            }
-            this.CallErrorAwareCtxFunction(() => wolfssl.CTX_use_PrivateKey_file(this.ctx, path, wolfssl.SSL_FILETYPE_PEM), nameof(wolfssl.CTX_use_PrivateKey_file));
-        }
-
-        public void SetCAFile(string path)
-        {
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException($"{path} for CA does not exist");
-            }
-            this.CallErrorAwareCtxFunction(() => wolfssl.CTX_load_verify_locations(this.ctx, path, null), nameof(wolfssl.CTX_load_verify_locations));
-        }
-
-        public void RequirePeerCertificate()
-        {
-            this.CallErrorAwareCtxFunction(() => wolfssl.CTX_set_verify(this.ctx, wolfssl.SSL_VERIFY_FAIL_IF_NO_PEER_CERT | wolfssl.SSL_VERIFY_PEER,
-                (currentStatus, _) => currentStatus), nameof(wolfssl.CTX_set_verify));
-        }
-
-        public DTLSConnectionContext CreateConnectionContext(IPEndPoint remote)
-        {
-            var ssl = wolfssl.new_ssl(this.ctx);
-            if (ssl == IntPtr.Zero)
-            {
-                throw new InvalidOperationException($"Cant create new dtls session");
-            }
-            var context = new DTLSConnectionContext(ssl, remote);
-            this.CallErrorAwareCtxFunction(() => wolfssl.set_dtls_fd(ssl, this.sendContext, context), nameof(wolfssl.set_dtls_fd));
-            return context;
-        }
-
-
-        private void CallErrorAwareCtxFunction(Func<int> functionCall, string name = "")
-        {
-            if (functionCall() != wolfssl.SUCCESS)
-            {
-                int err = wolfssl.X509_STORE_CTX_get_error(this.ctx);
-                var strError = wolfssl.get_error(err);
-                throw new InvalidOperationException($"{name} returned error: {strError}");
-            }
-        }
-    }
-
-    internal class HandshakeFailedException : Exception
-    {
-        public HandshakeFailedException(string message)
-        {
-            
-        }
-    }
-
-    internal class DTLSConnectionContext
-    {
-        private readonly IntPtr ssl;
-        private byte[] availableData = Array.Empty<byte>();
-        public DTLSConnectionContext(IntPtr ssl, IPEndPoint remote)
-        {
-            this.ssl = ssl;
-            this.Remote = remote;
-        }
-
-        public IPEndPoint Remote { get; }
-
-        public X509Certificate? Certificate { get; private set; }
-
-        public void SendData(byte[] data)
-        {
-            int ret = wolfssl.write(this.ssl, data, data.Length);
-            if (ret < 0)
-            {
-                var err = wolfssl.get_error_int(this.ssl);
-                var errStr = wolfssl.get_error(err);
-                throw new InvalidOperationException($"Send to {this.Remote} failed: {errStr}");
-            }
-        }
-
-        public void ReceivedData(byte[] data)
-        {
-            this.availableData = data;
-        }
-
-        public bool TryDequeueData(out byte[] data)
-        {
-            if (this.availableData.Length == 0)
-            {
-                data = Array.Empty<byte>();
-                return false;
-            }
-            data = this.availableData;
-            this.availableData = Array.Empty<byte>();
-            return true;
-        }
-
-        /// <summary>
-        /// Tries to finish handshake.
-        /// </summary>
-        /// <returns>True when handshake finished, false when handshake is ongoing.</returns>
-        /// <exception cref="HandshakeFailedException"></exception>
-        public bool accept()
-        {
-            var ret = wolfssl.accept(this.ssl);
-            if (ret != wolfssl.SUCCESS)
-            {
-                var err = wolfssl.get_error_int(this.ssl);
-                if (err != -1 * wolfssl.CBIO_ERR_WANT_READ)
-                {
-                    var errStr = wolfssl.get_error(err);
-                    throw new HandshakeFailedException($"Handshake with {this.Remote} failed: {errStr}");
-                }
-
-                return false;
-            }
-
-            var wolfsslCertificate = wolfssl.get_peer_certificate(this.ssl);
-            this.Certificate = new X509Certificate(wolfsslCertificate.Export());
-            return true;
-        }
-
-        public int TryReadData(byte[] data)
-        {
-            var ret = wolfssl.read(this.ssl, data, data.Length);
-            if (ret < 0)
-            {
-                var err = wolfssl.get_error_int(this.ssl);
-                if (err != -1 * wolfssl.CBIO_ERR_WANT_READ)
-                {
-                    var errStr = wolfssl.get_error(err);
-                    throw new InvalidOperationException($"Receive from {this.Remote} failed: {errStr}");
-                }
-
-                return 0;
-            }
-            return ret;
-        }
-    }
-
-    internal class HandshakeEventArgs : EventArgs
-    {
-        public bool Success { get; set; }
-    }
-
-    internal class ReceivedDataEventArgs : EventArgs
-    {
-        public byte[] Bytes { get; set; }
-    }
-
-    internal class DTLSErrorEventArgs : EventArgs
-    {
-
-    }
-
-    internal class DTLSConnection
-    {
-        private readonly DTLSConnectionContext context;
-        private readonly int bufferSize;
-        public event EventHandler<HandshakeEventArgs> HandshakeCompleted;
-        public event EventHandler<ReceivedDataEventArgs> Received;
-        public event EventHandler<DTLSErrorEventArgs> ErrorOccured;
-
-        private bool handshakeCompleted = false;
-
-        public DTLSConnection(DTLSConnectionContext context, int bufferSize = 1024)
-        {
-            this.context = context;
-            this.bufferSize = bufferSize;
-        }
-
-        public IPEndPoint Remote => this.context.Remote;
-        public X509Certificate? Certificate => this.context.Certificate;
-
-        public void HandleInput(Memory<byte> input)
-        {
-            this.context.ReceivedData(input.ToArray());
-            if (!this.handshakeCompleted)
-            {
-                this.PerformHandshake();
-            }
-            else
-            {
-                this.ReadData();
-            }
-        }
-
-        public void SendData(byte[] data)
-        {
-            this.context.SendData(data);
-        }
-
-        private void ReadData()
-        {
-            var buffer = new byte[this.bufferSize];
-            var ret = this.context.TryReadData(buffer);
-            if (ret > 0)
-            {
-                this.Received?.Invoke(this, new ReceivedDataEventArgs() {Bytes = buffer.Take(ret).ToArray(),});
-            }
-
-        }
-
-        private void PerformHandshake()
-        {
-            try
-            {
-                if (this.context.accept())
-                {
-                    this.handshakeCompleted = true;
-                    this.HandshakeCompleted?.Invoke(this, new HandshakeEventArgs()
-                    {
-                        Success = true,
-                    });
-                }
-            }
-            catch (HandshakeFailedException)
-            {
-                this.HandshakeCompleted?.Invoke(this, new HandshakeEventArgs()
-                {
-                    Success = false,
-                });
-            }
         }
     }
 }

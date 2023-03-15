@@ -31,7 +31,7 @@
         public string PublicIdentifier { get; set; }
     }
 
-    public interface IDTLSStack: IDisposable
+    public interface IDTLSStack
     {
         //public event EventHandler ClientConnected;
         //public event EventHandler ClientDisconnected;

@@ -11,7 +11,6 @@
         private readonly IDTLSStack stack;
         public void Dispose()
         {
-            stack.Dispose();
         }
 
         public EndPoint LocalEndPoint => this.stack.LocalEndPoint;
