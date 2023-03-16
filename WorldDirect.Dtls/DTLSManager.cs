@@ -11,11 +11,14 @@
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
 
+    /// <summary>
+    /// Handles the DTLS connections of a server.
+    /// </summary>
     public class DTLSManager : IDTLSStack
     {
         // do not throw SocketError.ConnectionReset by ignoring ICMP Port Unreachable
         private const Int32 SIO_UDP_CONNRESET = -1744830452;
-        private DTLSContext context;
+        private DTLSContext? context;
         private readonly DTLSConfig config;
         private readonly ILogger<DTLSManager> logger;
         private CancellationTokenSource cts = new ();
@@ -24,6 +27,12 @@
         private bool isRunning;
         private readonly IMemoryCache cache;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DTLSManager"/> class.
+        /// </summary>
+        /// <param name="config">The config to configure the DTLSServer.</param>
+        /// <param name="cache">The cache to store DTLSConnections on.</param>
+        /// <param name="logger">The logger.</param>
         public DTLSManager(DTLSConfig config, IMemoryCache cache, ILogger<DTLSManager> logger)
         {
             this.config = config;
@@ -32,8 +41,16 @@
         }
 
         public event EventHandler<DTLSDecryptedDataReceivedEventArgs>? ReceivedData;
+
+        /// <summary>
+        /// Gets the endpoint of the DTLS socket.
+        /// </summary>
         public EndPoint LocalEndPoint => new IPEndPoint(IPAddress.Any, this.config.Port);
 
+        /// <summary>
+        /// Starts a background task which handles the incoming dtls sessions.
+        /// </summary>
+        /// <exception cref="InvalidOperationException"></exception>
         public void Start()
         {
             if (isRunning)
@@ -47,9 +64,10 @@
                 socket.IOControl(SIO_UDP_CONNRESET, new Byte[] { 0 }, null);
                 this.socket.Bind(this.LocalEndPoint);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 this.socket = null;
+                this.logger.LogError(e, "Cant start DTLSServer on {LocalEndpoint}", this.LocalEndPoint);
                 throw;
             }
 
@@ -58,6 +76,9 @@
             this.receivingTask = this.HandleReceiveAsync(cts.Token);
         }
 
+        /// <summary>
+        /// Stop handling of the dtls sessions.
+        /// </summary>
         public void Stop()
         {
             if (!isRunning)
@@ -69,6 +90,11 @@
             this.receivingTask?.GetAwaiter().GetResult();
         }
 
+        /// <summary>
+        /// Encrypt data and send it to the specified remote endpoint. Does nothing if no dtls session is available with the remote endpoint.
+        /// </summary>
+        /// <param name="message">The bytes to send encrypted.</param>
+        /// <param name="remote">The endpoint to send the data to.</param>
         public void SendTo(byte[] message, IPEndPoint remote)
         {
             if (this.cache.TryGetValue<DTLSConnection>(remote, out var connection))
@@ -100,7 +126,7 @@
                 SocketReceiveFromResult receiveResult;
                 try
                 {
-                    receiveResult = await this.socket.ReceiveFromAsync(rxBuffer, SocketFlags.None, endpoint, ct).ConfigureAwait(false);
+                    receiveResult = await this.socket!.ReceiveFromAsync(rxBuffer, SocketFlags.None, endpoint, ct).ConfigureAwait(false);
                 }
                 catch (SocketException e)
                 {
@@ -125,7 +151,7 @@
                         },
                         State = this,
                     });
-                    var connectionContext = this.context.CreateConnectionContext(ipEndpoint);
+                    var connectionContext = this.context!.CreateConnectionContext(ipEndpoint);
                     var conn = new DTLSConnection(connectionContext, this.config.BufferSize);
                     conn.ErrorOccured += OnErrorOccured;
                     conn.HandshakeCompleted += OnHandshakeCompleted;
@@ -148,7 +174,7 @@
                 this.context.SetSendCallback(((memory, point) =>
                 {
                     this.logger.LogTrace("Send {Bytes} bytes to {Remote}", memory.Length, point);
-                    this.socket.SendTo(memory.ToArray(), point);
+                    this.socket!.SendTo(memory, point);
                 }));
                 this.context.RequirePeerCertificate();
                 this.context.SetCAFile(this.config.CAFile);
@@ -164,16 +190,18 @@
 
         private void OnDataReceived(object? sender, ReceivedDataEventArgs e)
         {
-            var connection = (DTLSConnection)sender;
-            var dtlsClient = new DTLSClient(connection.Remote);
-            dtlsClient.Certificate = connection.Certificate;
-            dtlsClient.PublicIdentifier = connection.Certificate.GetCommonName();
+            var connection = (DTLSConnection)sender!;
+            var dtlsClient = new DTLSClient(connection.Remote)
+            {
+                Certificate = connection.Certificate,
+                PublicIdentifier = connection.Certificate!.GetCommonName()
+            };
             this.ReceivedData?.Invoke(this, new DTLSDecryptedDataReceivedEventArgs(dtlsClient, e.Bytes));
         }
 
         private void OnHandshakeCompleted(object? sender, HandshakeEventArgs e)
         {
-            var connection = (DTLSConnection)sender;
+            var connection = (DTLSConnection)sender!;
             if (e.Success)
             {
                 this.logger.LogDebug("Handshake completed {HandshakeResult} with {Remote}", "successfully", connection.Remote);
@@ -188,7 +216,7 @@
 
         private void OnErrorOccured(object? sender, DTLSErrorEventArgs e)
         {
-            var connection = (DTLSConnection)sender;
+            var connection = (DTLSConnection)sender!;
             if (e.Exception != null)
             {
                 this.logger.LogError(e.Exception, "DTLSConnection with {Remote} was closed because of '{Message}'.", connection.Remote, e.Message);
