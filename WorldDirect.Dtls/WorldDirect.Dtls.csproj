@@ -12,13 +12,8 @@
     </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\bc-csharp\crypto\src\BouncyCastle.Crypto.csproj" />
     <ProjectReference Include="..\WorldDirect.CoAP\WorldDirect.CoAP.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="wolfssl.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
