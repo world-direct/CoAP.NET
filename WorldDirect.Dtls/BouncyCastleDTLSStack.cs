@@ -4,6 +4,7 @@
     using System.Net;
     using System.Text;
     using CoAP.Net;
+    using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
     using WorldDirect.CoAP.Server;
 
@@ -13,19 +14,18 @@
         private readonly ILogger<BouncyCastleDTLSStack> logger;
         private readonly DTLSServer server;
 
-        public BouncyCastleDTLSStack(DTLSConfig config, IServiceProvider serviceProvider, ILogger<BouncyCastleDTLSStack> logger)
+        public BouncyCastleDTLSStack(DTLSConfig config, IMemoryCache cache, IServiceProvider serviceProvider, ILogger<BouncyCastleDTLSStack> logger)
         {
             this.config = config;
             this.logger = logger;
-            this.server = new DTLSServer(config.Port, serviceProvider);
+            this.server = new DTLSServer(config.Port, config.Timeout, cache, serviceProvider);
             this.server.ReceivedData += Server_ReceivedData;
         }
 
         private void Server_ReceivedData(object? sender, ReceivedDTLSPacketEventArgs e)
         {
             var client = new DTLSClient(e.Remote);
-            client.Certificate = e.Certificate;
-            client.PublicIdentifier = e.Certificate.GetCommonName();
+            client.PublicIdentifier = e.PublicIdentifier;
             this.logger.LogTrace("Received {bytes} decrypted bytes from {remote}", e.Payload.Length, e.Remote);
             this.ReceivedData?.Invoke(this, new DTLSDecryptedDataReceivedEventArgs(client, e.Payload));
         }

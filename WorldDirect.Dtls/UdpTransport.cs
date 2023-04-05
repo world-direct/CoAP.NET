@@ -20,12 +20,12 @@ public class UdpTransport : DatagramTransport
         this.sema = new SemaphoreSlim(0);
         this.receivedQueue = new ConcurrentQueue<byte[]>();
         this.Enqueue(firstMessage);
-        this.server.ReceivedData += Server_ReceivedData;
+        this.server.ReceivedData += ServerReceivedDataForward;
     }
 
     public event EventHandler? ReceivedData;
 
-    private void Server_ReceivedData(object? sender, ReceivedPacketEventArgs e)
+    private void ServerReceivedDataForward(object? sender, ReceivedPacketEventArgs e)
     {
         if (e.Remote.Equals(this.Remote))
         {
@@ -82,6 +82,6 @@ public class UdpTransport : DatagramTransport
 
     public void Close()
     {
-        this.server.ReceivedData -= Server_ReceivedData;
+        this.server.ReceivedData -= ServerReceivedDataForward;
     }
 }

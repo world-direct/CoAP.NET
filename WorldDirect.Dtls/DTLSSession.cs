@@ -15,22 +15,27 @@ public class DTLSSession
     private DtlsTransport? dtlsTransport;
     private Task? handshakeTask;
 
-    public DTLSSession(TlsCrypto crypto, UdpTransport udpTransport, ILogger<DTLSSession> logger)
+    public DTLSSession(TlsCrypto crypto, UdpTransport udpTransport, TlsPskIdentityManager? pskManager, ILogger<DTLSSession> logger)
     {
         this.udpTransport = udpTransport;
         this.logger = logger;
-        this.server = new Server(crypto);
+        this.server = new Server(crypto, pskManager);
         this.protocol = new DtlsServerProtocol();
-
+        this.HandshakeFailed = false;
     }
 
     public event EventHandler? ReceivedData;
+    public event EventHandler<HandshakeFinishedEventArgs>? HandshakeFinished;
+
     public bool HandshakeCompleted => this.server.IsConnected;
+    public bool HandshakeFailed { get; private set; }
 
     public IPEndPoint Remote => this.udpTransport.Remote;
 
-    public System.Security.Cryptography.X509Certificates.X509Certificate ClientCertificate =>
-        this.server.GetPeerCertificate();
+    public System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificate =>
+        this.server.Certificate;
+
+    public string PublicIdentifier => this.server.PublicIdentifier;
 
     public void Start()
     {
@@ -59,7 +64,7 @@ public class DTLSSession
     private async Task Handshake()
     {
         var fac = new TaskFactory();
-        this.handshakeTask = fac.StartNew(() => this.HandleHandshakeAsync(CancellationToken.None),
+        this.handshakeTask = fac.StartNew(this.HandleHandshake,
             TaskCreationOptions.RunContinuationsAsynchronously);
         try
         {
@@ -67,18 +72,27 @@ public class DTLSSession
         }
         catch (Exception ex)
         {
-            this.logger.LogError(ex, "Handshake with {remote} failed because of {error}", this.Remote, ex.Message);
+            this.logger.LogDebug(ex, "Handshake with {remote} failed because of {error}", this.Remote, ex.Message);
+            this.HandshakeFailed = true;
+        }
+        finally
+        {
+            this.HandshakeFinished?.Invoke(this, new HandshakeFinishedEventArgs()
+            {
+                Result = !this.HandshakeFailed,
+                Certificate = this.ClientCertificate,
+                PublicIdentifier = this.PublicIdentifier,
+            });
         }
     }
 
-    private Task HandleHandshakeAsync(CancellationToken ct)
+    private void HandleHandshake()
     {
         this.dtlsTransport = this.protocol.Accept(this.server, this.udpTransport);
-        this.logger.LogDebug("Handshake accepted with {remote}", this.Remote);
+        this.logger.LogDebug("Handshake finished with {remote}", this.Remote);
         this.udpTransport.ReceivedData += (sender, args) =>
         {
             this.ReceivedData?.Invoke(this, args);
         };
-        return Task.CompletedTask;
     }
 }
