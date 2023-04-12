@@ -12,17 +12,17 @@
     {
         private readonly DTLSConfig config;
         private readonly ILogger<BouncyCastleDTLSStack> logger;
-        private readonly DTLSServer server;
+        private readonly DTLSSessionManager sessionManager;
 
         public BouncyCastleDTLSStack(DTLSConfig config, IMemoryCache cache, IServiceProvider serviceProvider, ILogger<BouncyCastleDTLSStack> logger)
         {
             this.config = config;
             this.logger = logger;
-            this.server = new DTLSServer(config.Port, config.Timeout, cache, serviceProvider);
-            this.server.ReceivedData += Server_ReceivedData;
+            this.sessionManager = new DTLSSessionManager(config.Port, config.Timeout, cache, serviceProvider);
+            this.sessionManager.ReceivedData += SessionManagerReceivedData;
         }
 
-        private void Server_ReceivedData(object? sender, ReceivedDTLSPacketEventArgs e)
+        private void SessionManagerReceivedData(object? sender, ReceivedAuthenticatedPacketEventArgs e)
         {
             var client = new DTLSClient(e.Remote);
             client.PublicIdentifier = e.PublicIdentifier;
@@ -34,18 +34,18 @@
         public EndPoint LocalEndPoint { get; }
         public void Start()
         {
-            this.server.Start();
+            this.sessionManager.Start();
         }
 
         public void Stop()
         {
-            this.server.Stop();
+            this.sessionManager.Stop();
         }
 
         public void SendTo(byte[] message, IPEndPoint remote)
         {
             this.logger.LogTrace("Sends {bytes} decrypted bytes to {remote}", message.Length, remote);
-            this.server.SendTo(message, remote);
+            this.sessionManager.SendTo(message, remote);
         }
     }
 }

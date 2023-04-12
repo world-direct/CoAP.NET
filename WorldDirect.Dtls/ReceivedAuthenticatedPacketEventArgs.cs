@@ -3,7 +3,7 @@
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 
-public class ReceivedDTLSPacketEventArgs
+public class ReceivedAuthenticatedPacketEventArgs
 {
     public byte[] Payload { get; set; }
     public IPEndPoint Remote { get; set; }

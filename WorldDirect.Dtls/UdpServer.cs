@@ -25,7 +25,7 @@ public class UdpServer
     {
         if (this.socket != null)
         {
-            throw new InvalidOperationException("Server already started");
+            throw new InvalidOperationException("DTLSServer already started");
         }
 
         this.StartHandle();
@@ -47,7 +47,7 @@ public class UdpServer
     {
         if (this.socket == null)
         {
-            throw new InvalidOperationException("Server is not running");
+            throw new InvalidOperationException("DTLSServer is not running");
         }
         this.socket.SendTo(payload, remote);
     }

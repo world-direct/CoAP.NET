@@ -1,120 +1,311 @@
 ﻿namespace WorldDirect.Dtls;
 
-using System.Collections.Concurrent;
-using System.Net;
-using System.Runtime.CompilerServices;
 using System.Text;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.Nist;
+using Org.BouncyCastle.Asn1.Pkcs;
+using Org.BouncyCastle.Asn1.Sec;
+using Org.BouncyCastle.Asn1.X509;
+using Org.BouncyCastle.Asn1.X9;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Pkcs;
+using Org.BouncyCastle.Pkix;
+using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Tls;
+using Org.BouncyCastle.Tls.Crypto;
 using Org.BouncyCastle.Tls.Crypto.Impl.BC;
+using Org.BouncyCastle.Utilities;
+using Org.BouncyCastle.Utilities.IO.Pem;
+using Org.BouncyCastle.X509;
 
-
-public class PskManager : TlsPskIdentityManager
+class DTLSServer : AbstractTlsServer
 {
-    public byte[] GetHint()
+    private readonly TlsPskIdentityManager? pskManager;
+
+    private static readonly int[] DefaultCipherSuites = new int[]
     {
-        // not needed in server mode
-        return null;
+        /*
+             * TLS 1.3
+             */
+        //CipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+        //CipherSuite.TLS_AES_256_GCM_SHA384,
+        //CipherSuite.TLS_AES_128_GCM_SHA256,
+        CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CCM_8,
+        CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+        CipherSuite.TLS_PSK_WITH_AES_128_CCM_8,
+        CipherSuite.TLS_PSK_WITH_AES_128_CBC_SHA256
+        /*
+         * pre-TLS 1.3
+         */
+        /*CipherSuite.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+        CipherSuite.TLS_DHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+        CipherSuite.TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
+        CipherSuite.TLS_DHE_RSA_WITH_AES_128_GCM_SHA256,
+        CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA256,
+        CipherSuite.TLS_DHE_RSA_WITH_AES_128_CBC_SHA256,
+        CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,
+        CipherSuite.TLS_DHE_RSA_WITH_AES_128_CBC_SHA,*/
+        /*CipherSuite.TLS_RSA_WITH_AES_256_GCM_SHA384,
+        CipherSuite.TLS_RSA_WITH_AES_128_GCM_SHA256,
+        CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA256,
+        CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA256,
+        CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA,
+        CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA,*/
+    };
+    public DTLSServer(TlsCrypto crypto, TlsPskIdentityManager? pskManager) : base(crypto)
+    {
+        this.pskManager = pskManager;
     }
 
-    public byte[] GetPsk(byte[] identity)
+    public string PublicIdentifier
     {
-        return new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, };
-    }
-}
-
-public class DTLSServer
-{
-    private readonly TimeSpan sessionTimeout;
-    private readonly IMemoryCache cache;
-    private readonly IServiceProvider serviceProvider;
-    private readonly BcTlsCrypto crypto = new BcTlsCrypto();
-    private readonly UdpServer server;
-    private readonly ILogger<DTLSServer> logger;
-    private readonly TlsPskIdentityManager pskManager = new PskManager();
-
-    public DTLSServer(ushort port, TimeSpan sessionTimeout, IMemoryCache cache, IServiceProvider serviceProvider)
-    {
-        this.sessionTimeout = sessionTimeout;
-        this.cache = cache;
-        this.serviceProvider = serviceProvider;
-        this.server = new UdpServer(port, 1024);
-        this.server.ReceivedData += ServerReceivedData;
-        this.logger = serviceProvider.GetRequiredService<ILogger<DTLSServer>>();
-    }
-
-    public event EventHandler<ReceivedDTLSPacketEventArgs>? ReceivedData;
-
-    private void ServerReceivedData(object? sender, ReceivedPacketEventArgs e)
-    {
-        this.cache.GetOrCreate(e.Remote, entry =>
+        get
         {
-            entry.SlidingExpiration = this.sessionTimeout;
-            entry.PostEvictionCallbacks.Add(new PostEvictionCallbackRegistration()
+            if (this.Certificate == null)
             {
-                EvictionCallback = (key, value, reason, state) =>
-                {
-                    var rem = (IPEndPoint)key;
-                    this.logger.LogDebug("Removed DTLS Connection to {remote} because of timeout", rem);
-                },
-                State = this,
-            });
-            this.logger.LogDebug("New DtlsSession created with {remote}", e.Remote);
-            var newTransport = new UdpTransport(this.server, e.Remote, e.Payload, this.serviceProvider.GetRequiredService<ILogger<UdpTransport>>());
-            var newSession = new DTLSSession(this.crypto, newTransport, this.pskManager, this.serviceProvider.GetRequiredService<ILogger<DTLSSession>>());
-            newSession.ReceivedData += SessionReceivedData;
-            newSession.HandshakeFinished += SessionHandshakeCompleted;
-            newSession.Start();
-            return newSession;
-        });
-    }
+                return Encoding.ASCII.GetString(this.m_context.SecurityParameters.PskIdentity);
+            }
 
-    private void SessionHandshakeCompleted(object? sender, HandshakeFinishedEventArgs e)
-    {
-        var session = (DTLSSession)sender!;
-        if (!e.Result)
-        {
-            this.cache.Remove(session.Remote);
+            return this.Certificate.GetCommonName();
         }
     }
 
-    private void SessionReceivedData(object? sender, EventArgs args)
+    public System.Security.Cryptography.X509Certificates.X509Certificate? Certificate
     {
-        var buffer = new byte[this.server.MaxMessageSize];
-        DTLSSession session = (DTLSSession)sender;
-        var len = session.Receive(buffer, TimeSpan.FromMilliseconds(1));
-        if (len == 0)
+        get
         {
-            // WHAT TO DO?
-            throw new NotImplementedException("happens this because of a close request from client?");
-        }
-        this.ReceivedData?.Invoke(this, new ReceivedDTLSPacketEventArgs()
-        {
-            PublicIdentifier = session.PublicIdentifier,
-            Payload = buffer.Take(len).ToArray(),
-            Remote = session.Remote,
-        });
-    }
-
-    public void SendTo(ReadOnlySpan<byte> payload, IPEndPoint remote)
-    {
-        if (this.cache.TryGetValue<DTLSSession>(remote, out var session))
-        {
-            session.Send(payload);
+            return this.GetPeerCertificate();
         }
     }
 
-    public void Start()
+    private System.Security.Cryptography.X509Certificates.X509Certificate? GetPeerCertificate()
     {
-        this.server.Start();
+        if (this.m_context.SecurityParameters.PeerCertificate == null || this.m_context.SecurityParameters.PeerCertificate.IsEmpty)
+        {
+            return null;
+        }
+        var certBytes = this.m_context.SecurityParameters.PeerCertificate.GetCertificateList().First().GetEncoded();
+        var cert = new System.Security.Cryptography.X509Certificates.X509Certificate(certBytes);
+        return cert;
     }
 
-    public void Stop()
+
+    public override ProtocolVersion GetServerVersion()
     {
-        this.server.Stop();
+        ProtocolVersion serverVersion = base.GetServerVersion();
+
+        Console.WriteLine("DTLS server negotiated " + serverVersion);
+
+        return serverVersion;
     }
 
+    public override CertificateRequest GetCertificateRequest()
+    {
+        var serverSigAlgs = TlsUtilities.GetDefaultSupportedSignatureAlgorithms(m_context);
+        // send back a list of supported CAs (if wanted)
+        var certificateAuthorities = new List<X509Name>() { new X509Name("CN=World-DirectRootCA512"), };
+        short[] certificateTypes = new short[] { ClientCertificateType.rsa_sign, ClientCertificateType.ecdsa_sign, };
 
+        return new CertificateRequest(certificateTypes, serverSigAlgs, null);
+    }
+
+    protected override ProtocolVersion[] GetSupportedVersions()
+    {
+        return ProtocolVersion.DTLSv12.Only();
+    }
+
+    protected override int[] GetSupportedCipherSuites()
+    {
+        return TlsUtilities.GetSupportedCipherSuites(Crypto, DefaultCipherSuites);
+    }
+
+    protected virtual TlsCredentialedDecryptor GetRsaEncryptionCredentials()
+    {
+        throw new NotImplementedException();
+        /*var privateKey = LoadPrivateKey("crypt/server-key-wolfssl.pem");
+        var certificate = LoadCertificateChain("crypt/server-cert-wolfssl.pem");
+        return new BcDefaultTlsCredentialedDecryptor((BcTlsCrypto)this.Crypto, new Certificate(new[] { certificate }),
+            privateKey);*/
+    }
+
+    protected virtual TlsCredentialedSigner GetECDsaSignerCredentials()
+    {
+        var sighashDict = new Dictionary<string, SignatureAndHashAlgorithm>() {
+        { X9ObjectIdentifiers.ECDsaWithSha256.Id, new SignatureAndHashAlgorithm(HashAlgorithm.sha256, SignatureAlgorithm.ecdsa)},
+        { X9ObjectIdentifiers.ECDsaWithSha384.Id, new SignatureAndHashAlgorithm(HashAlgorithm.sha384, SignatureAlgorithm.ecdsa)},
+        { X9ObjectIdentifiers.ECDsaWithSha512.Id, new SignatureAndHashAlgorithm(HashAlgorithm.sha512, SignatureAlgorithm.ecdsa)},
+        };
+        var clientSupportedSigAlgs = this.m_context.SecurityParameters.ClientSigAlgs;
+        var clientECDsaSigAlgs = clientSupportedSigAlgs.Where(sig => sig.Signature == SignatureAlgorithm.ecdsa);
+        if (clientSupportedSigAlgs.Any() && !clientECDsaSigAlgs.Any())
+        {
+            throw new TlsFatalAlert(AlertDescription.illegal_parameter);
+        }
+
+        var serverNames = this.m_context.SecurityParameters.ClientServerNames;
+        var store = this.LoadStore("server.p12","lukas!");
+        var certificates = store.GetCertificateChain("server");
+        var key = store.GetKey("server");
+        IList<X509Certificate> selectedCertificateList;
+        foreach (var certificate in certificates)
+        {
+            
+        }
+        if (key.Key is ECPrivateKeyParameters eckey)
+        {
+
+            //X9ObjectIdentifiers.ECDsaWithSha384
+            //X9ObjectIdentifiers.ECDsaWithSha512
+            if (certificates[0].Certificate.SigAlgOid == X9ObjectIdentifiers.ECDsaWithSha256.Id)
+            {
+
+            }
+            var tlsCertificate = this.Crypto.CreateCertificate(CertificateType.X509, certificates[0].Certificate.GetEncoded());
+            var signer = new BcTlsECDsaSigner((BcTlsCrypto)this.Crypto, eckey);
+            var parameter = new TlsCryptoParameters(this.m_context);
+            var ecdsa = SignatureAlgorithm.ecdsa;
+            var alg = clientSupportedSigAlgs.First(alg => alg.Hash == this.m_context.SecurityParameters.PrfCryptoHashAlgorithm && alg.Signature == ecdsa);
+            var credSigner = new DefaultTlsCredentialedSigner(parameter, signer, new Certificate(new[] { tlsCertificate }), alg);
+            return credSigner;
+        }
+        //var sig = new BcTlsECDsaSigner((BcTlsCrypto)this.Crypto, )
+        //var signer = new DefaultTlsCredentialedSigner()
+        throw new TlsFatalAlert(AlertDescription.internal_error);
+    }
+
+    public override TlsCredentials GetCredentials()
+    {
+        int keyExchangeAlgorithm = m_context.SecurityParameters.KeyExchangeAlgorithm;
+
+        switch (keyExchangeAlgorithm)
+        {
+            case KeyExchangeAlgorithm.DHE_DSS:
+            // return GetDsaSignerCredentials(); // see DefaultTlsServer for possible implementation
+            case KeyExchangeAlgorithm.DHE_RSA:
+            case KeyExchangeAlgorithm.ECDHE_RSA:
+                //return GetRsaSignerCredentials(); // see DefaultTlsServer for possible implementation
+
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+
+
+            case KeyExchangeAlgorithm.ECDHE_ECDSA:
+                return GetECDsaSignerCredentials();
+
+            case KeyExchangeAlgorithm.RSA:
+                return GetRsaEncryptionCredentials();
+
+            case KeyExchangeAlgorithm.DHE_PSK:
+            case KeyExchangeAlgorithm.ECDHE_PSK:
+            case KeyExchangeAlgorithm.PSK:
+                return null;
+
+
+            default:
+                // Note: internal error here; selected a key exchange we don't implement!
+                throw new TlsFatalAlert(AlertDescription.internal_error);
+        }
+    }
+
+    public bool IsConnected { get; private set; } = false;
+
+    public override void NotifyHandshakeComplete()
+    {
+        base.NotifyHandshakeComplete();
+        this.IsConnected = true;
+    }
+
+    public override void NotifyClientCertificate(Certificate clientCertificate)
+    {
+        if (clientCertificate.IsEmpty)
+        {
+            throw new TlsFatalAlert(AlertDescription.handshake_failure);
+        }
+        //var ca = LoadCertificateChain("WorldDirectRoot.crt");
+        var ca = LoadCertificateChain("ca-cert.pem");
+
+        var chain = clientCertificate.GetCertificateList();
+
+        var chainAsCertificate = chain.Select(c => new X509Certificate(c.GetEncoded())).ToArray();
+
+        var caX509 = ca.Single();
+        var trustAnchor = new TrustAnchor(caX509, null);
+
+        var parameters = new PkixParameters(new SortedSet<TrustAnchor>() { trustAnchor });
+        parameters.IsRevocationEnabled = false;
+        var path = new PkixCertPath(chainAsCertificate);
+        var validator = new PkixCertPathValidator();
+        validator.Validate(path, parameters);
+    }
+
+    /*protected override TlsCredentialedSigner GetRsaSignerCredentials()
+        {
+            var key = LoadPrivateKey("ecc-key.pem");
+            var certificate = LoadCertificateChain("server-cert.pem");
+            return new BcDefaultTlsCredentialedSigner(new TlsCryptoParameters(this.m_context), (BcTlsCrypto)this.Crypto, key,
+                new Certificate(new [] {certificate}), SignatureAndHashAlgorithm.rsa_pss_pss_sha256);
+        }*/
+
+    public override TlsPskIdentityManager GetPskIdentityManager()
+    {
+        if (this.pskManager == null)
+        {
+            return base.GetPskIdentityManager();
+        }
+
+        return this.pskManager;
+    }
+
+    private IList<X509Certificate> LoadCertificateChain(string path)
+    {
+        X509CertificateParser parser = new X509CertificateParser();
+        using var file = File.Open(path, FileMode.Open);
+        return parser.ReadCertificates(file);
+    }
+
+    private Pkcs12Store LoadStore(string fileName, string password)
+    {
+        var store = new Pkcs12StoreBuilder().Build();
+        using var reader = File.OpenRead(fileName);
+        store.Load(reader, password.ToCharArray());
+        return store;
+    }
+
+    private AsymmetricKeyParameter LoadPrivateKey(string path)
+    {
+        PemObject pem;
+        {
+            using var file = File.Open(path, FileMode.Open);
+            using var streamReader = new StreamReader(file);
+            using var pemReader = new PemReader(streamReader);
+
+            pem = pemReader.ReadPemObject();
+        }
+        
+        if (pem.Type.Equals("RSA PRIVATE KEY"))
+        {
+            var rsa = RsaPrivateKeyStructure.GetInstance(pem.Content);
+            return new RsaPrivateCrtKeyParameters(rsa.Modulus, rsa.PublicExponent,
+                rsa.PrivateExponent, rsa.Prime1, rsa.Prime2, rsa.Exponent1,
+                rsa.Exponent2, rsa.Coefficient);
+        }
+        else if (pem.Type.Equals("EC PRIVATE KEY"))
+        {
+            ECPrivateKeyStructure pKey = ECPrivateKeyStructure.GetInstance(pem.Content);
+            AlgorithmIdentifier algId = new AlgorithmIdentifier(X9ObjectIdentifiers.IdECPublicKey,
+                pKey.GetParameters());
+            PrivateKeyInfo privInfo = new PrivateKeyInfo(algId, pKey);
+            return PrivateKeyFactory.CreateKey(privInfo);
+        }
+
+        throw new InvalidOperationException($"Cant decode private key in file {path}");
+
+
+    }
 }
