@@ -19,7 +19,7 @@ namespace WorldDirect.CoAP.Net
     using Observe;
     using Util;
 
-    class Matcher : IMatcher, IDisposable
+    public class Matcher : IMatcher, IDisposable
     {
         static readonly ILogger log = LogManager.GetLogger(typeof(Matcher));
 
