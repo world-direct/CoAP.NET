@@ -14,6 +14,7 @@
     /// </summary>
     public class DTLSSessionManager
     {
+        // todo X509Certificate dotnet forwarding
         private readonly IMemoryCache cache;
         private readonly IUDPSender sender;
         private readonly IDTLSFactory factory;
@@ -66,7 +67,7 @@
         {
             var session = this.cache.GetOrCreate(endPoint, entry =>
             {
-                entry.AbsoluteExpiration = DateTimeOffset.Now + config.SessionTimeout;
+                entry.SlidingExpiration = config.SessionTimeout;
                 var callback = new PostEvictionCallbackRegistration()
                 {
                     EvictionCallback = OnEviction,
@@ -75,11 +76,21 @@
 
                 var s = new DTLSSession(this.sender, this.factory.CreateServer(), endPoint, CancellationTokenSource.CreateLinkedTokenSource(this.cts.Token), this.config);
                 s.DataReceived += DecryptedReceived;
+                s.HandshakeFinished += HandshakeFinished;
                 s.Start();
                 return s;
             });
 
             session.Enqueue(packet);
+        }
+
+        private void HandshakeFinished(object? sender, HandshakeFinishedEventArgs e)
+        {
+            var session = (sender as DTLSSession)!;
+            if (!e.Successful)
+            {
+                this.cache.Remove(session.Remote);
+            }
         }
 
         private void DecryptedReceived(object? _, DataReceivedEventArgs e)

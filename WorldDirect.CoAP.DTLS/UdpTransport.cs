@@ -18,11 +18,6 @@ internal class UdpTransport : DatagramTransport
         this.maxPacketLength = maxPacketLength;
     }
 
-    public Task<bool> WaitForMessageAsync(TimeSpan timeout, CancellationToken ct)
-    {
-        return this.sema.WaitAsync(timeout, ct);
-    }
-
     public EndPoint Remote { get; }
 
     public int GetReceiveLimit()

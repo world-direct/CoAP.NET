@@ -15,10 +15,12 @@ public class DTLSServer : AbstractTlsServer
         this.config = config;
     }
 
-    public string PeerPublicIdentifier { get; private set; }
+    public TlsCertificate? PeerCertificate => this.m_context.SecurityParameters.PeerCertificate.IsEmpty ? null : this.m_context.SecurityParameters.PeerCertificate.GetCertificateAt(0);
 
-    // todo X509Certificate dotnet
-    public X509Certificate? PeerCertificate { get; private set; }
+    public override int GetHandshakeTimeoutMillis()
+    {
+        return (int)this.config.HandshakeTimeout.TotalMilliseconds;
+    }
 
     protected override ProtocolVersion[] GetSupportedVersions()
     {
@@ -32,12 +34,20 @@ public class DTLSServer : AbstractTlsServer
 
     public override Org.BouncyCastle.Tls.CertificateRequest GetCertificateRequest()
     {
+        // if no CAs are registered, we wont need a certificate for authentication.
+        if (this.config.CAs.Count == 0)
+        {
+            return null;
+        }
+
         var serverSigAlgs = TlsUtilities.GetDefaultSupportedSignatureAlgorithms(m_context);
         // currently only ecdsa supported
+        // todo check if any is RSA certificate and add RSA certificate type
         serverSigAlgs = serverSigAlgs.Where(s => s.Signature == SignatureAlgorithm.ecdsa).ToList();
 
-        // send back a list of supported CAs (if wanted)
+        // send back a list of supported CAs
         var authorities = this.config.CAs.Select(ca => ca.SubjectDN).ToList();
+        
         short[] certificateTypes = new short[] { ClientCertificateType.ecdsa_sign, };
 
         return new CertificateRequest(certificateTypes, serverSigAlgs, authorities);
@@ -75,9 +85,6 @@ public class DTLSServer : AbstractTlsServer
 
     private TlsCredentialedSigner GetECDsaSignerCredentials()
     {
-        var serverSigAlgs = TlsUtilities.GetDefaultSupportedSignatureAlgorithms(m_context);
-        // currently only ecdsa supported
-        serverSigAlgs = serverSigAlgs.Where(s => s.Signature == SignatureAlgorithm.ecdsa).ToList();
         var clientSupportedSigAlgs = this.m_context.SecurityParameters.ClientSigAlgs;
         var clientECDsaSigAlgs = clientSupportedSigAlgs.Where(sig => sig.Signature == SignatureAlgorithm.ecdsa);
         if (!clientECDsaSigAlgs.Any())
@@ -100,7 +107,7 @@ public class DTLSServer : AbstractTlsServer
 
     private EcServerCertificate FindCertificate(IList<ServerName> names)
     {
-        // implement if multiple certificates are required.
+        // todo implement if multiple certificates are required.
         // how to distinguish?
         // https://en.wikipedia.org/wiki/Subject_Alternative_Name#:~:text=Subject%20Alternative%20Name%20(SAN)%20is,Subject%20Alternative%20Names%20(SANs).
         // or only common name?

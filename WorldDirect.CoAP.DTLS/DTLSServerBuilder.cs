@@ -39,6 +39,12 @@ public class DTLSServerBuilder
         return this;
     }
 
+    public DTLSServerBuilder WithHandShakeTimeout(TimeSpan timeout)
+    {
+        this.config.HandshakeTimeout = timeout;
+        return this;
+    }
+
     /// <summary>
     /// Loads the certificate chain and its private key from the store. The store must be loaded before with <seealso cref="WithStore"/> function.
     /// </summary>

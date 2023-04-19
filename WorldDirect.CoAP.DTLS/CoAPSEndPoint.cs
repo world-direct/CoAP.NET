@@ -36,7 +36,6 @@ namespace WorldDirect.CoAP.Net
         private IMessageDeliverer _deliverer;
         private IMatcher _matcher;
         private Int32 _running;
-        private System.Net.EndPoint _localEP;
         private IExecutor _executor;
         private DTLSChannel channel;
 
@@ -70,6 +69,15 @@ namespace WorldDirect.CoAP.Net
             this.channel.DataReceived += Channel_DataReceived;
         }
 
+        public CoAPSEndpoint(IMemoryCache cache, IDTLSFactory factory, UDPChannel channel)
+        {
+            _config = CoapConfig.Default;
+            _matcher = new Matcher(this._config);
+            _coapStack = new CoapStack(this._config);
+            this.channel = new DTLSChannel(channel, cache, factory);
+            this.channel.DataReceived += Channel_DataReceived;
+        }
+
 
         /// <inheritdoc/>
         public ICoapConfig Config
@@ -88,10 +96,7 @@ namespace WorldDirect.CoAP.Net
         }
 
         /// <inheritdoc/>
-        public System.Net.EndPoint LocalEndPoint
-        {
-            get { return _localEP; }
-        }
+        public System.Net.EndPoint LocalEndPoint => this.channel.LocalEndPoint;
 
         /// <inheritdoc/>
         public IMessageDeliverer MessageDeliverer
@@ -134,12 +139,12 @@ namespace WorldDirect.CoAP.Net
             catch
             {
                 if (log.IsWarnEnabled)
-                    log.Warn("Cannot start endpoint at " + this.channel.LocalEndPoint);
+                    log.Warn("Cannot start secure endpoint at " + this.channel.LocalEndPoint);
                 Stop();
                 throw;
             }
             if (log.IsDebugEnabled)
-                log.Debug("Starting endpoint bound to " + this.channel.LocalEndPoint);
+                log.Debug("Starting secure endpoint bound to " + this.channel.LocalEndPoint);
         }
 
         /// <inheritdoc/>
@@ -148,7 +153,7 @@ namespace WorldDirect.CoAP.Net
             if (System.Threading.Interlocked.Exchange(ref _running, 0) == 0)
                 return;
             if (log.IsDebugEnabled)
-                log.Debug("Stopping endpoint bound to " + _localEP);
+                log.Debug("Stopping secure endpoint bound to " + this.LocalEndPoint);
             this.channel.Stop();
             _matcher.Stop();
             _matcher.Clear();
