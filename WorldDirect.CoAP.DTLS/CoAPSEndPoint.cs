@@ -40,6 +40,9 @@ namespace WorldDirect.CoAP.Net
         private DTLSChannel channel;
 
         /// <inheritdoc/>
+        public string Scheme => CoapConstants.SecureUriScheme;
+
+        /// <inheritdoc/>
         public event EventHandler<MessageEventArgs<Request>> SendingRequest;
         /// <inheritdoc/>
         public event EventHandler<MessageEventArgs<Response>> SendingResponse;
@@ -66,7 +69,7 @@ namespace WorldDirect.CoAP.Net
             channel.SendBufferSize = this._config.ChannelSendBufferSize;
             channel.ReceivePacketSize = this._config.ChannelReceivePacketSize;
             this.channel = new DTLSChannel(channel, cache, factory);
-            this.channel.DataReceived += Channel_DataReceived;
+            this.channel.DtlsDataReceived += Channel_DataReceived;
         }
 
         public CoAPSEndpoint(IMemoryCache cache, IDTLSFactory factory, UDPChannel channel)
@@ -75,7 +78,7 @@ namespace WorldDirect.CoAP.Net
             _matcher = new Matcher(this._config);
             _coapStack = new CoapStack(this._config);
             this.channel = new DTLSChannel(channel, cache, factory);
-            this.channel.DataReceived += Channel_DataReceived;
+            this.channel.DtlsDataReceived += Channel_DataReceived;
         }
 
 
@@ -194,7 +197,7 @@ namespace WorldDirect.CoAP.Net
         }
 
 
-        private void Channel_DataReceived(object? sender, DataReceivedEventArgs e)
+        private void Channel_DataReceived(object? sender, DTLSDataReceivedEventArgs e)
         {
             IMessageDecoder decoder = Spec.NewMessageDecoder(e.Data);
             if (decoder.IsRequest)
@@ -203,6 +206,7 @@ namespace WorldDirect.CoAP.Net
                 try
                 {
                     request = decoder.DecodeRequest();
+                    request.EndPoint = this;
                 }
                 catch (Exception)
                 {
@@ -237,7 +241,7 @@ namespace WorldDirect.CoAP.Net
                     if (exchange != null)
                     {
                         exchange.EndPoint = this;
-                        //exchange.Set(nameof(DTLSClient), e.Remote);
+                        exchange.Set(nameof(DTLSClientAuthentication), e.ClientAuthentication);
                         _coapStack.ReceiveRequest(exchange, request);
                     }
                 }

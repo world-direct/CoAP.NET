@@ -39,6 +39,11 @@ namespace WorldDirect.CoAP.Server.Resources
             _resource = resource;
         }
 
+        public T Get<T>(Object key)
+        {
+            return this._exchange.Get<T>(key);
+        }
+
         /// <summary>
         /// Gets the request.
         /// </summary>

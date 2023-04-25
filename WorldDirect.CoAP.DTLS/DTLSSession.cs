@@ -1,13 +1,9 @@
 ﻿namespace WorldDirect.CoAP.DTLS;
 
 using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using Channel;
 using Org.BouncyCastle.Tls;
-
-internal class HandshakeFinishedEventArgs : EventArgs
-{
-    public bool Successful { get; set; }
-}
 
 internal class DTLSSession
 {
@@ -34,8 +30,11 @@ internal class DTLSSession
     /// <summary>
     /// An event when a new decrypted payload was received.
     /// </summary>
-    public event EventHandler<DataReceivedEventArgs>? DataReceived;
+    public event EventHandler<DTLSDataReceivedEventArgs>? DataReceived;
 
+    /// <summary>
+    /// An event when the handshake was finished.
+    /// </summary>
     public event EventHandler<HandshakeFinishedEventArgs>? HandshakeFinished;
 
     /// <summary>
@@ -87,13 +86,21 @@ internal class DTLSSession
             }
             else if (length > 0)
             {
-                this.DataReceived?.Invoke(this, new DataReceivedEventArgs(rxBuffer.Take(length).ToArray(), this.transport.Remote));
+                if (this.dtlsServer.IsAuthenticated)
+                {
+                    if (this.dtlsServer.PeerCertificate != null)
+                    {
+                        var peerCert = new X509Certificate(this.dtlsServer.PeerCertificate.GetEncoded());
+                        this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(rxBuffer.Take(length).ToArray(), this.transport.Remote, peerCert));
+                    }
+                }
+                throw new NotImplementedException($"PSK or unauthenticated communication is not implemented");
             }
             
         }
     }
 
-    private async Task HandleSession()
+    private Task HandleSession()
     {
         try
         {
@@ -115,5 +122,7 @@ internal class DTLSSession
         {
             this.HandshakeFinished?.Invoke(this, new HandshakeFinishedEventArgs() { Successful = !this.HandshakeFailed });
         }
+
+        return Task.CompletedTask;
     }
 }

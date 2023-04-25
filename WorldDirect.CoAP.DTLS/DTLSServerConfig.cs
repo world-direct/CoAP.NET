@@ -1,11 +1,23 @@
 ﻿namespace WorldDirect.CoAP.DTLS;
 
+/// <summary>
+/// Represents the configuration of the <see cref="DTLSServer"/>.
+/// </summary>
 public class DTLSServerConfig
 {
-    public List<EcServerCertificate> EcCertificates { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the certificate of the server.
+    /// </summary>
+    public EcServerCertificate? EcCertificate { get; set; }
 
-    public List<Org.BouncyCastle.X509.X509Certificate> CAs { get; set; } = new ();
+    /// <summary>
+    /// Gets or sets the CA to authorize the connecting clients.
+    /// </summary>
+    public Org.BouncyCastle.X509.X509Certificate? CA { get; set; }
 
+    /// <summary>
+    /// Gets or sets the available cipher suites.
+    /// </summary>
     public List<int> CipherSuites { get; set; } = new();
 
     /// <summary>

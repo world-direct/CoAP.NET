@@ -14,7 +14,6 @@
     /// </summary>
     public class DTLSSessionManager
     {
-        // todo X509Certificate dotnet forwarding
         private readonly IMemoryCache cache;
         private readonly IUDPSender sender;
         private readonly IDTLSFactory factory;
@@ -38,7 +37,7 @@
         /// <summary>
         /// An event to notify listener a new decrypted udp packet was received.
         /// </summary>
-        public event EventHandler<DataReceivedEventArgs>? DataReceived;
+        public event EventHandler<DTLSDataReceivedEventArgs>? DataReceived;
 
         /// <summary>
         /// Send a udp packet encrypted to the remote endpoint.
@@ -53,6 +52,9 @@
             }
         }
 
+        /// <summary>
+        /// Stops the manager.
+        /// </summary>
         public void Stop()
         {
             this.cts.Cancel();
@@ -93,7 +95,7 @@
             }
         }
 
-        private void DecryptedReceived(object? _, DataReceivedEventArgs e)
+        private void DecryptedReceived(object? _, DTLSDataReceivedEventArgs e)
         {
             this.DataReceived?.Invoke(this, e);
         }

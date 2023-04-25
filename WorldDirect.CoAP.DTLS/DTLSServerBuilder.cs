@@ -10,7 +10,7 @@ using Org.BouncyCastle.Tls.Crypto.Impl.BC;
 using Org.BouncyCastle.X509;
 
 /// <summary>
-///
+/// A helper class to configure the <see cref="DTLSServer"/>.
 /// </summary>
 /// <remarks>
 /// Limitations:
@@ -24,12 +24,21 @@ public class DTLSServerBuilder
 
     private readonly DTLSServerConfig config;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DTLSServerBuilder"/> class.
+    /// </summary>
     public DTLSServerBuilder()
     {
         this.crypto = new BcTlsCrypto(new SecureRandom());
         this.config = new DTLSServerConfig();
     }
 
+    /// <summary>
+    /// Add a pkcs12 store where the certificate will be loaded from.
+    /// </summary>
+    /// <param name="file">Path to the file.</param>
+    /// <param name="password">Password of the file.</param>
+    /// <returns>The builder.</returns>
     public DTLSServerBuilder WithStore(string file, string password)
     {
         var store = new Pkcs12StoreBuilder().Build();
@@ -39,6 +48,11 @@ public class DTLSServerBuilder
         return this;
     }
 
+    /// <summary>
+    /// Set the timeout of the handshake.
+    /// </summary>
+    /// <param name="timeout">The timeout.</param>
+    /// <returns>The builder.</returns>
     public DTLSServerBuilder WithHandShakeTimeout(TimeSpan timeout)
     {
         this.config.HandshakeTimeout = timeout;
@@ -74,11 +88,7 @@ public class DTLSServerBuilder
         var ecPrivateKey = (key.Key as ECPrivateKeyParameters)!;
         var ecdsaCertificate = new Certificate(x509Certs.ToArray());
 
-        this.config.EcCertificates.Add(new EcServerCertificate(ecdsaCertificate, ecPrivateKey));
-        if (this.config.EcCertificates.Count > 1)
-        {
-            throw new InvalidOperationException("Currently one one certificate is supported.");
-        }
+        this.config.EcCertificate = new EcServerCertificate(ecdsaCertificate, ecPrivateKey);
         return this;
     }
 
@@ -98,10 +108,16 @@ public class DTLSServerBuilder
         {
             throw new InvalidOperationException($"Could not read certificate from {filename}");
         }
-        this.config.CAs.Add(cert);
+
+        this.config.CA = cert;
         return this;
     }
 
+    /// <summary>
+    /// Adds enabled ciphersuites to the server.
+    /// </summary>
+    /// <param name="suites">The cipher suites to add.</param>
+    /// <returns>The builder</returns>
     public DTLSServerBuilder WithCipherSuites(IEnumerable<int> suites)
     {
         this.config.CipherSuites.AddRange(suites);
@@ -109,6 +125,10 @@ public class DTLSServerBuilder
         return this;
     }
 
+    /// <summary>
+    /// Builds the <see cref="DTLSServer"/> based on the configuration.
+    /// </summary>
+    /// <returns>The configured <see cref="DTLSServer"/>.</returns>
     public DTLSServer Build()
     {
         return new DTLSServer(this.crypto, this.config);

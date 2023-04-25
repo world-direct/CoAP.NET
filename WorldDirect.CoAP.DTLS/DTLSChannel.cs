@@ -9,18 +9,38 @@
     using System.Threading.Tasks;
     using Microsoft.Extensions.Caching.Memory;
 
+    /// <summary>
+    /// Represents the dtls channel for a coap communication.
+    /// </summary>
     public class DTLSChannel : IChannel
     {
         private readonly UDPChannel channel;
         private readonly DTLSSessionManager sessionManager;
 
-        public DTLSChannel(UDPChannel channel, IMemoryCache cache, IDTLSFactory factory)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DTLSChannel"/> class.
+        /// </summary>
+        /// <param name="channel">The underlying udp channel used to send/receive data.</param>
+        /// <param name="cache">The cache to store dtls sessions.</param>
+        /// <param name="factory">The factory to create dtls server.</param>
+        /// <param name="sessionTimeout">The timeout after which a session is deleted.</param>
+        public DTLSChannel(UDPChannel channel, IMemoryCache cache, IDTLSFactory factory, TimeSpan sessionTimeout)
         {
             this.channel = channel;
             this.channel.DataReceived += DtlsReceived;
-            // todo configure sessiontimeout
-            var config = new DTLSSessionConfig() {MaxPacketLength = channel.ReceivePacketSize, SessionTimeout = TimeSpan.FromMinutes(3),};
+            var config = new DTLSSessionConfig() { MaxPacketLength = channel.ReceivePacketSize, SessionTimeout = sessionTimeout, };
             this.sessionManager = new DTLSSessionManager(cache, new UdpChannelSender(channel), factory, config);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DTLSChannel"/> class.
+        /// </summary>
+        /// <param name="channel">The underlying udp channel used to send/receive data.</param>
+        /// <param name="cache">The cache to store dtls sessions.</param>
+        /// <param name="factory">The factory to create dtls server.</param>
+        public DTLSChannel(UDPChannel channel, IMemoryCache cache, IDTLSFactory factory)
+        : this(channel, cache, factory, TimeSpan.FromMinutes(2))
+        {
         }
 
         private void DtlsReceived(object? sender, DataReceivedEventArgs e)
@@ -28,33 +48,47 @@
             this.sessionManager.ReceivedUdpPacket(e.Data, e.EndPoint);
         }
 
+        /// <inheritdoc />
         public void Dispose()
         {
             this.Stop();
         }
 
+        /// <inheritdoc />
         public EndPoint LocalEndPoint => this.channel.LocalEndPoint;
+
+        /// <inheritdoc />
         public event EventHandler<DataReceivedEventArgs>? DataReceived;
+
+        /// <summary>
+        /// An event to forward dtls relevant data with a received message.
+        /// </summary>
+        public event EventHandler<DTLSDataReceivedEventArgs>? DtlsDataReceived;
+
+        /// <inheritdoc />
         public void Start()
         {
             this.channel.Start();
             this.sessionManager.DataReceived += DecryptedForwarding;
         }
 
+        /// <inheritdoc />
         public void Stop()
         {
             this.channel.Stop();
             this.sessionManager.Stop();
         }
 
+        /// <inheritdoc />
         public void Send(byte[] data, EndPoint ep)
         {
             this.sessionManager.SendTo(data, ep);
         }
 
-        private void DecryptedForwarding(object? sender, DataReceivedEventArgs e)
+        private void DecryptedForwarding(object? sender, DTLSDataReceivedEventArgs e)
         {
             this.DataReceived?.Invoke(this, e);
+            this.DtlsDataReceived?.Invoke(this, e);
         }
     }
 }

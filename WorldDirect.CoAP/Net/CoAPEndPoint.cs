@@ -35,6 +35,8 @@ namespace WorldDirect.CoAP.Net
         private System.Net.EndPoint _localEP;
         private IExecutor _executor;
 
+        public string Scheme => CoapConstants.UriScheme;
+
         /// <inheritdoc/>
         public event EventHandler<MessageEventArgs<Request>> SendingRequest;
         /// <inheritdoc/>
