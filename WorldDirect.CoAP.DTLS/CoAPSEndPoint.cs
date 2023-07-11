@@ -59,9 +59,9 @@ namespace WorldDirect.CoAP.Net
         /// Instantiates a new endpoint with the
         /// specified channel and configuration.
         /// </summary>
-        public CoAPSEndpoint(IMemoryCache cache, IDTLSFactory factory)
+        public CoAPSEndpoint(IMemoryCache cache, IDTLSFactory factory, ICoapConfig config)
         {
-            _config = CoapConfig.Default;
+            _config = config;
             _matcher = new Matcher(this._config);
             _coapStack = new CoapStack(this._config);
             UDPChannel channel = new UDPChannel(new IPEndPoint(IPAddress.Any, 5684));
@@ -70,11 +70,12 @@ namespace WorldDirect.CoAP.Net
             channel.ReceivePacketSize = this._config.ChannelReceivePacketSize;
             this.channel = new DTLSChannel(channel, cache, factory);
             this.channel.DtlsDataReceived += Channel_DataReceived;
+            this.log = LogManager.GetLogger<CoAPSEndpoint>();
         }
 
-        public CoAPSEndpoint(IMemoryCache cache, IDTLSFactory factory, UDPChannel channel)
+        public CoAPSEndpoint(IMemoryCache cache, IDTLSFactory factory, UDPChannel channel, ICoapConfig config)
         {
-            _config = CoapConfig.Default;
+            _config = config;
             _matcher = new Matcher(this._config);
             _coapStack = new CoapStack(this._config);
             this.channel = new DTLSChannel(channel, cache, factory);

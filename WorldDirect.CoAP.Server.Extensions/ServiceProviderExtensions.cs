@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Generic;
     using System.Net;
+    using System.Runtime.CompilerServices;
     using System.Security.Cryptography;
     using System.Text;
     using System.Threading.Tasks;
@@ -16,7 +17,16 @@
     using Org.BouncyCastle.Asn1.X509;
     using Org.BouncyCastle.Crypto;
     using Org.BouncyCastle.Ocsp;
+    using Org.BouncyCastle.Tls;
     using Org.BouncyCastle.X509;
+
+    /// <summary>
+    /// A helper function to determinate how PSKs are loaded and mapped to a CoAPS endpoint.
+    /// </summary>
+    /// <param name="serviceProvider">The service provider to load needed services from.</param>
+    /// <param name="key">The name of the endpoint configuration.</param>
+    /// <returns>The psk store.</returns>
+    public delegate TlsPskIdentityManager? PskIdentityManagerResolver(IServiceProvider serviceProvider, string key);
 
     public static class ServiceProviderExtensions
     {
@@ -26,6 +36,7 @@
         /// </summary>
         /// <remarks>
         /// If DTLS is used for for encryption a <see cref="IMemoryCache"/> must be provided in the service provider.
+        /// If PSKs should be used <see cref="PskIdentityManagerResolver"/> must be added to the ServiceCollection.
         /// </remarks>
         /// <param name="services"></param>
         /// <param name="configuration"></param>
@@ -49,7 +60,7 @@
             {
                 if (listenEndpoint!.EndpointConfig.CertificateConfig == null)
                 {
-                    // unsecure
+                    // insecure
                     server.AddEndPoint(listenEndpoint.Endpoint as IPEndPoint);
                 }
                 else
@@ -57,19 +68,33 @@
                     var dtlsServerBuilder = new DTLSServerBuilder()
                         .SetCertificate(listenEndpoint.EndpointConfig.CertificateConfig)
                         .SetHandshakeTimeout(listenEndpoint.EndpointConfig.HandshakeTimeout);
-
-                    if (listenEndpoint.EndpointConfig.ClientCA != null)
+                    var resolver = serviceProvider.GetService<PskIdentityManagerResolver>();
+                    if (resolver != null)
                     {
-                        dtlsServerBuilder.SetCA(listenEndpoint.EndpointConfig.ClientCA);
+                        var pskManager = resolver(serviceProvider, listenEndpoint.EndpointConfig.Name);
+                        if (pskManager != null)
+                        {
+                            dtlsServerBuilder.SetPskManager(pskManager);
+                        }
+                    }
+
+                    foreach (var ca in listenEndpoint.EndpointConfig.ClientCAs)
+                    {
+                        dtlsServerBuilder.AddCA(ca);
                     }
 
                     var channel = new UDPChannel(listenEndpoint.Endpoint);
-                    var config = CoapConfig.Default;
+                    var config = (CoapConfig)CoapConfig.Default;
+                    config.MaxMessageSize = options.MaxMessageSize;
+                    if(config.MaxMessageSize <= config.DefaultBlockSize)
+                    {
+                        config.DefaultBlockSize = config.MaxMessageSize / 2;
+                    }
                     channel.ReceiveBufferSize = config.ChannelReceiveBufferSize;
                     channel.SendBufferSize = config.ChannelSendBufferSize;
                     channel.ReceivePacketSize = config.ChannelReceivePacketSize;
 
-                    var ep = new CoAPSEndpoint(serviceProvider.GetRequiredService<IMemoryCache>(), new DTLSFactory(dtlsServerBuilder), channel);
+                    var ep = new CoAPSEndpoint(serviceProvider.GetRequiredService<IMemoryCache>(), new DTLSFactory(dtlsServerBuilder), channel, config);
 
                     server.AddEndPoint(ep);
                 }

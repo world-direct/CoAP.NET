@@ -71,12 +71,12 @@ public class DTLSServerBuilder
         return this;
     }
 
-    public DTLSServerBuilder SetCA(CertificateConfig config)
+    public DTLSServerBuilder AddCA(CertificateConfig config)
     {
         if (config.IsFromStore)
         {
             var cert = this.LoadCAFromStore(config);
-            this.config.CA = cert;
+            this.config.CAs.Add(cert);
         }
         else if (config.IsFile)
         {
@@ -91,7 +91,7 @@ public class DTLSServerBuilder
                 else if (!string.IsNullOrEmpty(config.Path))
                 {
                     var cert = this.LoadCertFromFile(config.Path!);
-                    this.config.CA = cert;
+                    this.config.CAs.Add(cert);
                 }
                 else
                 {
@@ -113,6 +113,14 @@ public class DTLSServerBuilder
     public DTLSServerBuilder SetHandshakeTimeout(TimeSpan timeout)
     {
         this.config.HandshakeTimeout = timeout;
+        return this;
+    }
+
+    public DTLSServerBuilder SetPskManager(TlsPskIdentityManager manager)
+    {
+        this.config.PskManager = manager;
+        this.config.CipherSuites.Add(CipherSuite.TLS_PSK_WITH_AES_128_CCM_8);
+        this.config.CipherSuites.Add(CipherSuite.TLS_PSK_WITH_AES_128_CBC_SHA256);
         return this;
     }
 
@@ -144,21 +152,22 @@ public class DTLSServerBuilder
         using var textReader = new StreamReader(reader);
         PemReader pemReader = new PemReader(textReader, new InMemoryPasswordFinder(password));
 
-        object keyObj = pemReader.ReadObject();
+        var keyObj = pemReader.ReadPemObject();
+        var key = PrivateKeyFactory.CreateKey(keyObj.Content);
 
-        if (keyObj.GetType() != typeof(ECPrivateKeyParameters))
+        if (key.GetType() != typeof(ECPrivateKeyParameters))
         {
             throw new InvalidOperationException($"{config.KeyPath} does not store a EC key. Currently only ECDSA is supported");
         }
 
-        var key = keyObj as ECPrivateKeyParameters;
+        var caPrivateKey = key as ECPrivateKeyParameters;
 
         var cert = this.LoadCertFromFile(config.Path!);
 
         var x509bc = this.crypto.CreateCertificate(cert!.GetEncoded());
 
         var ecdsaCertificate = new Certificate(new[] { x509bc });
-        var ecCert = new EcServerCertificate(ecdsaCertificate, key!);
+        var ecCert = new EcServerCertificate(ecdsaCertificate, caPrivateKey!);
         return ecCert;
     }
 

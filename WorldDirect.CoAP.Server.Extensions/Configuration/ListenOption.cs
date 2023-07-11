@@ -10,7 +10,6 @@ public class ListenOption
         this.Endpoint = endpoint;
         this.EndpointConfig = endpointConfig;
     }
-
     public EndPoint Endpoint { get; set; }
     public EndpointConfig EndpointConfig { get; set; }
 }

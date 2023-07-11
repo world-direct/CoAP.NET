@@ -30,10 +30,21 @@ public class CoAPServerOptionsLoader
             }
             else
             {
-                listenOptions.Add(new ListenOption(new IPEndPoint(IPAddress.Any, address.Port), endpoint));
+                var ipAddress = IPAddress.Any;
+                if(IPAddress.TryParse(address.Host, out var parsedAddress))
+                {
+                    ipAddress = parsedAddress;
+                }
+                listenOptions.Add(new ListenOption(new IPEndPoint(ipAddress, address.Port), endpoint));
             }
         }
 
-        return new CoAPServerOptions(listenOptions);
+        var options = new CoAPServerOptions(listenOptions);
+        if(reader.MaxMessageSize.HasValue)
+        {
+            options.MaxMessageSize = reader.MaxMessageSize.Value;
+        }
+
+        return options;
     }
 }

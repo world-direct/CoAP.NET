@@ -12,5 +12,6 @@
 
         public IEnumerable<ListenOption> ListenOptions { get; }
 
+        public int MaxMessageSize { get; set; } = 1024;
     }
 }

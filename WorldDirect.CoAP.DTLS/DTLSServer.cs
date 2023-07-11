@@ -33,7 +33,19 @@ public class DTLSServer : AbstractTlsServer
     /// <summary>
     /// Gets the certificate of the connected client.
     /// </summary>
-    public TlsCertificate? PeerCertificate => this.m_context.SecurityParameters.PeerCertificate.IsEmpty ? null : this.m_context.SecurityParameters.PeerCertificate.GetCertificateAt(0);
+    public TlsCertificate? PeerCertificate
+    {
+        get
+        {
+            if (this.m_context.SecurityParameters.PeerCertificate == null)
+            {
+                return null;
+            }
+            return this.m_context.SecurityParameters.PeerCertificate.IsEmpty ? null : this.m_context.SecurityParameters.PeerCertificate.GetCertificateAt(0);
+        }
+    }
+
+    public byte[] PskIdentity { get; private set; } = Array.Empty<byte>();
 
     /// <summary>
     /// Get the timeout of handshake.
@@ -62,6 +74,24 @@ public class DTLSServer : AbstractTlsServer
         return this.config.CipherSuites.ToArray();
     }
 
+    public override void NotifyHandshakeComplete()
+    {
+        if (this.m_context.SecurityParameters.PskIdentity != null)
+        {
+            this.PskIdentity = this.m_context.SecurityParameters.PskIdentity;
+            this.IsAuthenticated = true;
+        }
+    }
+
+    public override TlsPskIdentityManager GetPskIdentityManager()
+    {
+        if (this.config.PskManager == null)
+        {
+            return null;
+        }
+        return this.config.PskManager;
+    }
+
     /// <summary>
     /// Get the certificate request send to the client.
     /// </summary>
@@ -69,7 +99,7 @@ public class DTLSServer : AbstractTlsServer
     public override Org.BouncyCastle.Tls.CertificateRequest GetCertificateRequest()
     {
         // if no CAs are registered, we wont need a certificate for authentication.
-        if (this.config.CA == null)
+        if (!this.config.CAs.Any())
         {
             return null;
         }
@@ -80,7 +110,8 @@ public class DTLSServer : AbstractTlsServer
         serverSigAlgs = serverSigAlgs.Where(s => s.Signature == SignatureAlgorithm.ecdsa).ToList();
 
         // send back a list of supported CAs
-        var authorities = new List<X509Name>() {this.config.CA.SubjectDN};
+
+        var authorities = this.config.CAs.Select(c => c.SubjectDN).ToList();
         
         short[] certificateTypes = new short[] { ClientCertificateType.ecdsa_sign, };
 
@@ -97,6 +128,8 @@ public class DTLSServer : AbstractTlsServer
         int keyExchangeAlgorithm = m_context.SecurityParameters.KeyExchangeAlgorithm;
         switch (keyExchangeAlgorithm)
         {
+            case KeyExchangeAlgorithm.PSK:
+                return null;
             case KeyExchangeAlgorithm.ECDHE_ECDSA:
                 return GetECDsaSignerCredentials();
             default:
@@ -117,9 +150,9 @@ public class DTLSServer : AbstractTlsServer
 
         var chain = clientCertificate.GetCertificateList()!;
         var chainAsCertificate = chain.Select(c => new X509Certificate(c.GetEncoded())).ToArray();
-        var trustAnchor = new TrustAnchor(this.config.CA, null);
+        var trustAnchors = this.config.CAs.Select(c => new TrustAnchor(c, null)).ToList();
 
-        var parameters = new PkixParameters(new SortedSet<TrustAnchor>() { trustAnchor });
+        var parameters = new PkixParameters(new SortedSet<TrustAnchor>(trustAnchors));
         parameters.IsRevocationEnabled = false;
         var path = new PkixCertPath(chainAsCertificate);
         var validator = new PkixCertPathValidator();

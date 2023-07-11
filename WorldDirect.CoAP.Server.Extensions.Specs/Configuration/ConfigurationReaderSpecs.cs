@@ -64,7 +64,7 @@
         {
             var endpoints = this.reader.Endpoints;
             var endpoint = endpoints.Single();
-            endpoint.ClientCA.Should().HaveCount(2);
+            endpoint.ClientCAs.Should().HaveCount(2);
         }
 
         [Fact]

@@ -16,6 +16,7 @@ public class ConfigurationReader
     private const string CertificateKey = "Certificate";
     private const string ClientCAKey = "ClientCA";
     private const string HandshakeTimeoutKey = "HandshakeTimeout";
+    private const string MaxMessageSizeKey = "MaxMessageSize";
     private readonly IConfiguration config;
 
     public ConfigurationReader(IConfiguration config)
@@ -24,6 +25,8 @@ public class ConfigurationReader
     }
 
     public IEnumerable<EndpointConfig> Endpoints => this.ReadEndpoints();
+
+    public int? MaxMessageSize => this.config.GetSection(MaxMessageSizeKey).Exists() ? this.config.GetSection(MaxMessageSizeKey).Get<int>() : null;
 
     private IEnumerable<EndpointConfig> ReadEndpoints()
     {
@@ -44,15 +47,15 @@ public class ConfigurationReader
             {
                 certificateConfig = new CertificateConfig(endpointCfg.GetSection(CertificateKey));
             }
-            CertificateConfig? clientCAConfig = null;
+            IEnumerable<CertificateConfig>? clientCAConfig = null;
             if (endpointCfg.GetSection(ClientCAKey).GetChildren().Any())
             {
-                clientCAConfig = new CertificateConfig(endpointCfg.GetSection(ClientCAKey));
+                clientCAConfig = endpointCfg.GetSection(ClientCAKey).GetChildren().Select(c => new CertificateConfig(c));
             }
             var endpoint = new EndpointConfig(endpointCfg.Key, url)
             {
                 CertificateConfig = certificateConfig,
-                ClientCA = clientCAConfig,
+                ClientCAs = clientCAConfig != null ? clientCAConfig.ToList() : new List<CertificateConfig>(),
                 HandshakeTimeout = endpointCfg.GetSection(HandshakeTimeoutKey).Get<TimeSpan>(),
             };
 

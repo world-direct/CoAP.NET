@@ -109,7 +109,7 @@ public class DTLSServerBuilder
             throw new InvalidOperationException($"Could not read certificate from {filename}");
         }
 
-        this.config.CA = cert;
+        this.config.CAs.Add(cert);
         return this;
     }
 

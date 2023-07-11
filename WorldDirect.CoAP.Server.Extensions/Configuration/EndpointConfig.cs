@@ -16,12 +16,13 @@
         {
             this.Name = name;
             this.Url = url;
+            this.ClientCAs = new List<CertificateConfig>();
         }
 
         public string Name { get; set; }
         public string Url { get; set; }
         public CertificateConfig? CertificateConfig { get; set; }
-        public CertificateConfig? ClientCA { get; set; }
+        public List<CertificateConfig> ClientCAs { get; set; }
         public TimeSpan HandshakeTimeout { get; set; }
     }
 }

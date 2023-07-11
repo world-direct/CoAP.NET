@@ -1,9 +1,13 @@
 ﻿namespace WorldDirect.CoAP.DTLS;
 
+using System.Data;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using Channel;
 using Org.BouncyCastle.Tls;
+using WorldDirect.CoAP.Log;
+using WorldDirect.CoAP.Net;
 
 internal class DTLSSession
 {
@@ -15,6 +19,7 @@ internal class DTLSSession
     private DtlsTransport? dtlsTransport;
     private Task? HandshakeTask;
     private bool HandshakeFailed = false;
+    private readonly ILogger logger;
 
     public DTLSSession(IUDPSender sender, DTLSServer server, EndPoint remote, CancellationTokenSource cts, DTLSSessionConfig config)
     {
@@ -23,6 +28,7 @@ internal class DTLSSession
         this.transport = new UdpTransport(sender, remote, config.MaxPacketLength);
         this.protocol = new DtlsServerProtocol();
         this.dtlsServer = server;
+        this.logger = LogManager.GetLogger(typeof(DTLSSession));
     }
 
     public EndPoint Remote => this.transport.Remote;
@@ -93,6 +99,10 @@ internal class DTLSSession
                         var peerCert = new X509Certificate(this.dtlsServer.PeerCertificate.GetEncoded());
                         this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(rxBuffer.Take(length).ToArray(), this.transport.Remote, peerCert));
                     }
+                    else if (this.dtlsServer.PskIdentity.Any())
+                    {
+                        this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(rxBuffer.Take(length).ToArray(), this.transport.Remote, Encoding.ASCII.GetString(this.dtlsServer.PskIdentity)));
+                    }
                 }
                 throw new NotImplementedException($"PSK or unauthenticated communication is not implemented");
             }
@@ -110,7 +120,11 @@ internal class DTLSSession
         }
         catch (TlsTimeoutException e)
         {
-            // todo logging handshake timed out
+            this.HandshakeFailed = true;
+        }
+        catch (TlsFatalAlert e)
+        {
+            // todo logging
             this.HandshakeFailed = true;
         }
         catch (Exception e)
