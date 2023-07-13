@@ -6,8 +6,10 @@
     using Channel;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Internal;
+    using Microsoft.Extensions.Logging;
     using Org.BouncyCastle.Asn1.Nist;
     using Org.BouncyCastle.Asn1.X509;
+    using WorldDirect.CoAP.Log;
 
     /// <summary>
     /// Handles all dtls related traffic.
@@ -19,6 +21,7 @@
         private readonly IDTLSFactory factory;
         private readonly DTLSSessionConfig config;
         private readonly CancellationTokenSource cts;
+        private readonly ILogger<DTLSSessionManager> log = LogManager.GetLogger<DTLSSessionManager>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DTLSSessionManager"/> class.
@@ -46,9 +49,13 @@
         /// <param name="endPoint">The remote endpoint.</param>
         public void SendTo(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
-            if(this.cache.TryGetValue<DTLSSession>(endPoint, out var session))
+            if(this.cache.TryGetValue<DTLSSession>(endPoint.ToString(), out var session))
             {
                 session.Send(packet);
+            }
+            else
+            {
+                this.log.LogWarning("Tried to send data to {Remote} but no session available", endPoint);
             }
         }
 
@@ -67,7 +74,7 @@
         /// <param name="endPoint">The endpoint who sent the packet.</param>
         internal void ReceivedUdpPacket(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
-            var session = this.cache.GetOrCreate(endPoint, entry =>
+            var session = this.cache.GetOrCreate(endPoint.ToString(), entry =>
             {
                 entry.SlidingExpiration = config.SessionTimeout;
                 var callback = new PostEvictionCallbackRegistration()
@@ -79,6 +86,7 @@
                 var s = new DTLSSession(this.sender, this.factory.CreateServer(), endPoint, CancellationTokenSource.CreateLinkedTokenSource(this.cts.Token), this.config);
                 s.DataReceived += DecryptedReceived;
                 s.HandshakeFinished += HandshakeFinished;
+                this.log.LogInformation("Start DTLS connection with {Remote}", endPoint);
                 s.Start();
                 return s;
             });
@@ -91,7 +99,7 @@
             var session = (sender as DTLSSession)!;
             if (!e.Successful)
             {
-                this.cache.Remove(session.Remote);
+                this.cache.Remove(session.Remote.ToString());
             }
         }
 
@@ -103,6 +111,7 @@
         private static void OnEviction(object key, object value, EvictionReason reason, object state)
         {
             var obj = value as DTLSSession;
+            LogManager.GetLogger<DTLSSessionManager>().LogDebug("Session with {Remote} timed out", obj.Remote);
             obj?.Cancel();
         }
     }

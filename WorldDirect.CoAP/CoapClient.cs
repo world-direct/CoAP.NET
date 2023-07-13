@@ -5,6 +5,7 @@
     using System.Threading;
     using System.Threading.Tasks;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
 
     /// <summary>
@@ -15,7 +16,7 @@
         #region Locals
 
         private static readonly IEnumerable<WebLink> EmptyLinks = new WebLink[0];
-        private static ILogger log = LogManager.GetLogger(typeof(CoapClient));
+        private static ILogger<CoapClient> log = LogManager.GetLogger<CoapClient>();
 
         private ICoapConfig _config;
         private IEndPoint _endpoint;
@@ -587,8 +588,7 @@
                     }
                     else
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Dropping old notification: " + resp);
+                        log.LogDebug("Dropping old notification: " + resp);
                     }
                 }
             };

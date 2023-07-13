@@ -12,97 +12,32 @@
 namespace WorldDirect.CoAP.Log
 {
     using System;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Log manager.
     /// </summary>
     public static class LogManager
     {
-        static LogLevel _level = LogLevel.All;
-        static ILogManager _manager;
 
         static LogManager()
         {
-            Type test;
-            try
-            {
-                test = Type.GetType("Common.Logging.LogManager, Common.Logging");
-            }
-            catch
-            {
-                test = null;
-            }
-
-            _manager = NopLogManager.Instance;
+            
         }
 
-        /// <summary>
-        /// Gets or sets the global log level.
-        /// </summary>
-        public static LogLevel Level
-        {
-            get { return _level; }
-            set { _level = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the <see cref="ILogManager"/> to provide loggers.
-        /// </summary>
-        public static ILogManager Instance
-        {
-            get { return _manager; }
-            set { _manager = value ?? NopLogManager.Instance; }
-        }
+        public static IServiceProvider Provider { get; set; }
 
         /// <summary>
         /// Gets a logger for the given type.
         /// </summary>
-        public static ILogger GetLogger(Type type)
+        public static ILogger<T> GetLogger<T>()
         {
-            return _manager.GetLogger(type);
+            return (ILogger<T>)Provider?.GetService(typeof(ILogger<T>));
         }
 
-        /// <summary>
-        /// Gets a logger for the given type name.
-        /// </summary>
-        public static ILogger GetLogger(String name)
+        public static ILogger GetLogger()
         {
-            return _manager.GetLogger(name);
+            return (ILogger)Provider?.GetService(typeof(ILogger));
         }
-    }
-
-    /// <summary>
-    /// Log levels.
-    /// </summary>
-    public enum LogLevel
-    {
-        /// <summary>
-        /// All logs.
-        /// </summary>
-        All,
-        /// <summary>
-        /// Debugs and above.
-        /// </summary>
-        Debug,
-        /// <summary>
-        /// Infos and above.
-        /// </summary>
-        Info,
-        /// <summary>
-        /// Warnings and above.
-        /// </summary>
-        Warning,
-        /// <summary>
-        /// Errors and above.
-        /// </summary>
-        Error,
-        /// <summary>
-        /// Fatals only.
-        /// </summary>
-        Fatal,
-        /// <summary>
-        /// No logs.
-        /// </summary>
-        None
     }
 }

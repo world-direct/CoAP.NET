@@ -17,6 +17,7 @@ namespace WorldDirect.CoAP.Channel
     using System.Net.Sockets;
     using System.Threading;
     using Log;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Channel via UDP protocol.
@@ -24,7 +25,7 @@ namespace WorldDirect.CoAP.Channel
     public partial class UDPChannel : IChannel
     {
 
-        static readonly ILogger log = LogManager.GetLogger(typeof(UDPChannel));
+        private readonly ILogger<UDPChannel> log = LogManager.GetLogger<UDPChannel>();
 
         /// <summary>
         /// Default size of buffer for receiving packet.
@@ -252,13 +253,13 @@ namespace WorldDirect.CoAP.Channel
                 try
                 {
                     DateTimeOffset start = DateTimeOffset.Now;
-                    log.Info($"UDP-FireDataReceived START");
+                    log.LogTrace($"UDP-FireDataReceived START");
                     FireDataReceived(bytes, ep);
-                    log.Info($"UDP-FireDataReceived END ({DateTimeOffset.Now - start})");
+                    log.LogTrace("UDP-FireDataReceived END ({Duration})", DateTimeOffset.Now - start);
                 }
                 catch (Exception e)
                 {
-                    log.Error($"FireDataReceived error occurred: {e.ToString()}", e);
+                    log.LogError($"FireDataReceived error occurred: {e.ToString()}", e);
                 }
             }
         }

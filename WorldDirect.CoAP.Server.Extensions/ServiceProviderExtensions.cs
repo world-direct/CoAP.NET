@@ -19,6 +19,7 @@
     using Org.BouncyCastle.Ocsp;
     using Org.BouncyCastle.Tls;
     using Org.BouncyCastle.X509;
+    using WorldDirect.CoAP.Log;
 
     /// <summary>
     /// A helper function to determinate how PSKs are loaded and mapped to a CoAPS endpoint.
@@ -50,6 +51,7 @@
 
         private static CoapServer Configure(IServiceProvider serviceProvider, IConfiguration configuration)
         {
+            LogManager.Provider = serviceProvider;
             var server = new CoapServer();
 
 

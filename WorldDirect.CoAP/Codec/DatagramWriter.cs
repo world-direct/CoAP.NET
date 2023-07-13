@@ -14,13 +14,14 @@ namespace WorldDirect.CoAP.Codec
     using System;
     using System.IO;
     using Log;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// This class describes the functionality to write raw network-ordered datagrams on bit-level.
     /// </summary>
     public class DatagramWriter
     {
-        private static ILogger log = LogManager.GetLogger(typeof(DatagramWriter));
+        private static ILogger<DatagramWriter> log = LogManager.GetLogger<DatagramWriter>();
 
         private MemoryStream _stream;
         private Byte _currentByte;
@@ -45,8 +46,7 @@ namespace WorldDirect.CoAP.Codec
         {
             if (numBits < 32 && data >= (1 << numBits))
             {
-                if (log.IsWarnEnabled)
-                    log.Warn(String.Format("Truncating value {0} to {1}-bit integer", data, numBits));
+                log.LogWarning(String.Format("Truncating value {0} to {1}-bit integer", data, numBits));
             }
 
             for (Int32 i = numBits - 1; i >= 0; i--)

@@ -14,13 +14,14 @@ namespace WorldDirect.CoAP
     using System;
     using System.Text;
     using Log;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Class for linkformat attributes.
     /// </summary>
     public class LinkAttribute : IComparable<LinkAttribute>
     {
-        private static readonly ILogger log = LogManager.GetLogger(typeof(LinkAttribute));
+        private static readonly ILogger<LinkAttribute> log = LogManager.GetLogger<LinkAttribute>();
 
         private String _name;
         private Object _value;
@@ -98,8 +99,7 @@ namespace WorldDirect.CoAP
                     }
                     else
                     {
-                        if (log.IsErrorEnabled)
-                            log.Error(String.Format("Serializing attribute of unexpected type: {0} ({1})", _name, _value.GetType().Name));
+                            log.LogError(String.Format("Serializing attribute of unexpected type: {0} ({1})", _name, _value.GetType().Name));
                     }
                 }
             }

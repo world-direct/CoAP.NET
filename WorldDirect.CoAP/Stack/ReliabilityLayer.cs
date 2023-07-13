@@ -14,6 +14,7 @@ namespace WorldDirect.CoAP.Stack
     using System;
     using System.Threading;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
 
     /// <summary>
@@ -21,7 +22,7 @@ namespace WorldDirect.CoAP.Stack
     /// </summary>
     public class ReliabilityLayer : AbstractLayer
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(ReliabilityLayer));
+        static readonly ILogger<ReliabilityLayer> log = LogManager.GetLogger<ReliabilityLayer>();
         static readonly Object TransmissionContextKey = "TransmissionContext";
 
         private readonly Random _rand = new Random();
@@ -45,8 +46,7 @@ namespace WorldDirect.CoAP.Stack
 
             if (request.Type == MessageType.CON)
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Scheduling retransmission for " + request);
+                    log.LogTrace("Scheduling retransmission for " + request);
                 PrepareRetransmission(exchange, request, ctx => SendRequest(nextLayer, exchange, request));
             }
 
@@ -93,8 +93,7 @@ namespace WorldDirect.CoAP.Stack
 
             if (response.Type == MessageType.CON)
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Scheduling retransmission for " + response);
+                    log.LogTrace("Scheduling retransmission for " + response);
                 PrepareRetransmission(exchange, response, ctx => SendResponse(nextLayer, exchange, response));
             }
 
@@ -117,30 +116,26 @@ namespace WorldDirect.CoAP.Stack
                 // Request is a duplicate, so resend ACK, RST or response
                 if (exchange.CurrentResponse != null)
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Respond with the current response to the duplicate request");
+                        log.LogTrace("Respond with the current response to the duplicate request");
                     base.SendResponse(nextLayer, exchange, exchange.CurrentResponse);
                 }
                 else if (exchange.CurrentRequest != null)
                 {
                     if (exchange.CurrentRequest.IsAcknowledged)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("The duplicate request was acknowledged but no response computed yet. Retransmit ACK.");
+                            log.LogTrace("The duplicate request was acknowledged but no response computed yet. Retransmit ACK.");
                         EmptyMessage ack = EmptyMessage.NewACK(request);
                         SendEmptyMessage(nextLayer, exchange, ack);
                     }
                     else if (exchange.CurrentRequest.IsRejected)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("The duplicate request was rejected. Reject again.");
+                            log.LogTrace("The duplicate request was rejected. Reject again.");
                         EmptyMessage rst = EmptyMessage.NewRST(request);
                         SendEmptyMessage(nextLayer, exchange, rst);
                     }
                     else
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("The server has not yet decided what to do with the request. We ignore the duplicate.");
+                            log.LogTrace("The server has not yet decided what to do with the request. We ignore the duplicate.");
                         // The server has not yet decided, whether to acknowledge or
                         // reject the request. We know for sure that the server has
                         // received the request though and can drop this duplicate here.
@@ -175,16 +170,14 @@ namespace WorldDirect.CoAP.Stack
 
             if (response.Type == MessageType.CON && !exchange.Request.IsCancelled)
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Response is confirmable, send ACK.");
+                    log.LogTrace("Response is confirmable, send ACK.");
                 EmptyMessage ack = EmptyMessage.NewACK(response);
                 SendEmptyMessage(nextLayer, exchange, ack);
             }
 
             if (response.Duplicate)
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Response is duplicate, ignore it.");
+                    log.LogTrace("Response is duplicate, ignore it.");
             }
             else
             {
@@ -213,8 +206,7 @@ namespace WorldDirect.CoAP.Stack
                         exchange.CurrentResponse.IsRejected = true;
                     break;
                 default:
-                    if (log.IsWarnEnabled)
-                        log.Warn("Empty messgae was not ACK nor RST: " + message);
+                        log.LogTrace("Empty messgae was not ACK nor RST: " + message);
                     break;
             }
 
@@ -239,8 +231,7 @@ namespace WorldDirect.CoAP.Stack
                 ctx.CurrentTimeout = InitialTimeout(_config.AckTimeout, _config.AckRandomFactor);
             }
 
-            if (log.IsDebugEnabled)
-                log.Debug("Send request, failed transmissions: " + ctx.FailedTransmissionCount);
+                log.LogTrace("Send request, failed transmissions: " + ctx.FailedTransmissionCount);
 
             ctx.Start();
         }
@@ -307,15 +298,6 @@ namespace WorldDirect.CoAP.Stack
                 {
                     // ignore
                 }
-
-                if (log.IsDebugEnabled)
-                {
-                    log.Debug("Cancel retransmission for -->");
-                    if (_exchange.Origin == Origin.Local)
-                        log.Debug(_exchange.CurrentRequest);
-                    else
-                        log.Debug(_exchange.CurrentResponse);
-                }
             }
 
             public void Dispose()
@@ -334,26 +316,22 @@ namespace WorldDirect.CoAP.Stack
 
                 if (_message.IsAcknowledged)
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Timeout: message already acknowledged, cancel retransmission of " + _message);
+                        log.LogTrace("Timeout: message already acknowledged, cancel retransmission of " + _message);
                     return;
                 }
                 else if (_message.IsRejected)
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Timeout: message already rejected, cancel retransmission of " + _message);
+                        log.LogTrace("Timeout: message already rejected, cancel retransmission of " + _message);
                     return;
                 }
                 else if (_message.IsCancelled)
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Timeout: canceled (ID=" + _message.ID + "), do not retransmit");
+                        log.LogTrace("Timeout: canceled (ID=" + _message.ID + "), do not retransmit");
                     return;
                 }
                 else if (failedCount <= (_message.MaxRetransmit != 0 ? _message.MaxRetransmit : _config.MaxRetransmit))
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Timeout: retransmit message, failed: " + failedCount + ", message: " + _message);
+                        log.LogTrace("Timeout: retransmit message, failed: " + failedCount + ", message: " + _message);
 
                     _message.FireRetransmitting();
 
@@ -363,8 +341,7 @@ namespace WorldDirect.CoAP.Stack
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Timeout: retransmission limit reached, exchange failed, message: " + _message);
+                        log.LogTrace("Timeout: retransmission limit reached, exchange failed, message: " + _message);
                     _exchange.TimedOut = true;
                     _message.IsTimedOut = true;
                     _exchange.Remove(TransmissionContextKey);

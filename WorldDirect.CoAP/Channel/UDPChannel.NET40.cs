@@ -15,6 +15,7 @@ namespace WorldDirect.CoAP.Channel
     using System.Net;
     using System.Net.Sockets;
     using System.Transactions;
+    using Microsoft.Extensions.Logging;
 
     public partial class UDPChannel
     {
@@ -65,7 +66,7 @@ namespace WorldDirect.CoAP.Channel
 
             if (destination is IPEndPoint ep)
             {
-                log.Debug(message: $"Sending packet to {ep.Address.MapToIPv4()}:{ep.Port}. Processing package {(completedSynchronous ? "asynchronous" : "synchronous")}");
+                log.LogDebug(message: $"Sending packet to {ep.Address.MapToIPv4()}:{ep.Port}. Processing package {(completedSynchronous ? "asynchronous" : "synchronous")}");
             }
 
             if (completedSynchronous)

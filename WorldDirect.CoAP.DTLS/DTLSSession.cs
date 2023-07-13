@@ -5,6 +5,7 @@ using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Channel;
+using Microsoft.Extensions.Logging;
 using Org.BouncyCastle.Tls;
 using WorldDirect.CoAP.Log;
 using WorldDirect.CoAP.Net;
@@ -19,7 +20,7 @@ internal class DTLSSession
     private DtlsTransport? dtlsTransport;
     private Task? HandshakeTask;
     private bool HandshakeFailed = false;
-    private readonly ILogger logger;
+    private readonly ILogger<DTLSSession> logger;
 
     public DTLSSession(IUDPSender sender, DTLSServer server, EndPoint remote, CancellationTokenSource cts, DTLSSessionConfig config)
     {
@@ -28,7 +29,7 @@ internal class DTLSSession
         this.transport = new UdpTransport(sender, remote, config.MaxPacketLength);
         this.protocol = new DtlsServerProtocol();
         this.dtlsServer = server;
-        this.logger = LogManager.GetLogger(typeof(DTLSSession));
+        this.logger = LogManager.GetLogger<DTLSSession>();
     }
 
     public EndPoint Remote => this.transport.Remote;
@@ -56,8 +57,10 @@ internal class DTLSSession
     /// </summary>
     public void Start()
     {
+        var th = new Thread(async () => await this.HandleSession());
+        th.Start();
         // perform handshake asynchronously, would be blocking otherwise
-        Task.Run(async () => await this.HandleSession().ConfigureAwait(false));
+        //Task.Run(async () => await this.HandleSession().ConfigureAwait(false));
     }
 
     /// <summary>
@@ -85,12 +88,17 @@ internal class DTLSSession
         if (dtlsTransport != null)
         {
             var rxBuffer = new byte[this.config.MaxPacketLength];
-            var length = this.dtlsTransport!.Receive(rxBuffer, 0);
-            if (length < 0)
+            var length = 0;
+            try
             {
-                throw new InvalidOperationException("Could not read from dtls");
+                length = this.dtlsTransport!.Receive(rxBuffer, 1000);
             }
-            else if (length > 0)
+            catch(Exception ex)
+            {
+                this.logger.LogTrace(ex, "Cant receive decrypted dtls packet from {Remote}", this.Remote);
+            }
+
+            if (length > 0)
             {
                 if (this.dtlsServer.IsAuthenticated)
                 {
@@ -104,7 +112,11 @@ internal class DTLSSession
                         this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(rxBuffer.Take(length).ToArray(), this.transport.Remote, Encoding.ASCII.GetString(this.dtlsServer.PskIdentity)));
                     }
                 }
-                throw new NotImplementedException($"PSK or unauthenticated communication is not implemented");
+                else
+                {
+                    throw new NotImplementedException($"Unauthenticated communication is not implemented");
+                }
+                
             }
             
         }
@@ -116,20 +128,21 @@ internal class DTLSSession
         {
             // perform handshake
             this.dtlsTransport = this.protocol.Accept(this.dtlsServer, this.transport);
-            // todo logging
+            this.logger.LogInformation("{Remote} finished handshake successfully", this.Remote);
         }
         catch (TlsTimeoutException e)
         {
             this.HandshakeFailed = true;
+            this.logger.LogError(e, "{Remote} failed handshake because of timeout", this.Remote);
         }
         catch (TlsFatalAlert e)
         {
-            // todo logging
+            this.logger.LogError(e, "{Remote} failed handshake", this.Remote);
             this.HandshakeFailed = true;
         }
         catch (Exception e)
         {
-            // Todo logging
+            this.logger.LogError(e, "{Remote} failed handshake", this.Remote);
             this.HandshakeFailed = true;
         }
         finally

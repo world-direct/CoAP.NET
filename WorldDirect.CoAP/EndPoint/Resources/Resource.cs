@@ -15,13 +15,14 @@ namespace WorldDirect.CoAP.EndPoint.Resources
     using System.Collections.Generic;
     using System.Text;
     using Log;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// This class describes the functionality of a CoAP resource.
     /// </summary>
     public abstract class Resource : IComparable<Resource>
     {
-        private static ILogger log = LogManager.GetLogger(typeof(Resource));
+        private static ILogger<Resource> log = LogManager.GetLogger<Resource>();
 
         private Int32 _totalSubResourceCount;
         private String _resourceIdentifier;
@@ -345,8 +346,7 @@ namespace WorldDirect.CoAP.EndPoint.Resources
             {
                 if (_parent != null)
                 {
-                    if (log.IsWarnEnabled)
-                        log.Warn("Adding absolute path only allowed for root: made relative " + resource.Name);
+                        log.LogWarning("Adding absolute path only allowed for root: made relative " + resource.Name);
                 }
                 resource.Name = resource.Name.Substring(1);
             }
@@ -366,8 +366,7 @@ namespace WorldDirect.CoAP.EndPoint.Resources
             if (path.Length == 0)
             {
                 // resource replaces base
-                if (log.IsInfoEnabled)
-                    log.Info("Replacing resource " + baseRes.Path);
+                    log.LogInformation("Replacing resource " + baseRes.Path);
                 foreach (Resource sub in baseRes.GetSubResources())
                 {
                     sub._parent = resource;
@@ -383,8 +382,7 @@ namespace WorldDirect.CoAP.EndPoint.Resources
                 String[] segments = path.Split('/');
                 if (segments.Length > 1)
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Splitting up compound resource " + resource.Name);
+                        log.LogDebug("Splitting up compound resource " + resource.Name);
                     resource.Name = segments[segments.Length - 1];
 
                     // insert middle segments
@@ -403,8 +401,7 @@ namespace WorldDirect.CoAP.EndPoint.Resources
                 resource._parent = baseRes;
                 baseRes.SubResources[resource.Name] = resource;
 
-                if (log.IsDebugEnabled)
-                    log.Debug("Add resource " + resource.Name);
+                    log.LogDebug("Add resource " + resource.Name);
             }
 
             // update number of sub-resources in the tree

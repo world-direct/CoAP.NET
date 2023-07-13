@@ -13,10 +13,11 @@ namespace WorldDirect.CoAP.Deduplication
 {
     using System;
     using Log;
+    using Microsoft.Extensions.Logging;
 
     static class DeduplicatorFactory
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(DeduplicatorFactory));
+        static readonly ILogger log = LogManager.GetLogger();
         public const String MarkAndSweepDeduplicator = "MarkAndSweep";
         public const String CropRotationDeduplicator = "CropRotation";
         public const String NoopDeduplicator = "Noop";
@@ -33,8 +34,7 @@ namespace WorldDirect.CoAP.Deduplication
             else if (!String.Equals(NoopDeduplicator, type, StringComparison.OrdinalIgnoreCase)
                 && !String.Equals("NO_DEDUPLICATOR", type, StringComparison.OrdinalIgnoreCase))
             {
-                if (log.IsWarnEnabled)
-                    log.Warn("Unknown deduplicator type: " + type);
+                    log.LogWarning("Unknown deduplicator type: " + type);
             }
             return new NoopDeduplicator();
         }

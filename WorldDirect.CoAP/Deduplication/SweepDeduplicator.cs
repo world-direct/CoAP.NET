@@ -16,11 +16,12 @@ namespace WorldDirect.CoAP.Deduplication
     using System.Collections.Generic;
     using System.Threading;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
 
     class SweepDeduplicator : IDeduplicator
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(SweepDeduplicator));
+        static readonly ILogger<SweepDeduplicator> log = LogManager.GetLogger<SweepDeduplicator>();
 
         private ConcurrentDictionary<Exchange.KeyID, Exchange> _incommingMessages
             = new ConcurrentDictionary<Exchange.KeyID, Exchange>();
@@ -34,8 +35,7 @@ namespace WorldDirect.CoAP.Deduplication
 
         private void Sweep(object state)
         {
-            if (log.IsDebugEnabled)
-                log.Debug("Start Mark-And-Sweep with " + _incommingMessages.Count + " entries");
+                log.LogDebug("Start Mark-And-Sweep with " + _incommingMessages.Count + " entries");
 
             DateTime oldestAllowed = DateTime.Now.AddMilliseconds(-_config.ExchangeLifetime);
             List<Exchange.KeyID> keysToRemove = new List<Exchange.KeyID>();
@@ -43,8 +43,7 @@ namespace WorldDirect.CoAP.Deduplication
             {
                 if (pair.Value.Timestamp < oldestAllowed)
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Mark-And-Sweep removes " + pair.Key);
+                        log.LogDebug("Mark-And-Sweep removes " + pair.Key);
                     keysToRemove.Add(pair.Key);
                 }
             }
