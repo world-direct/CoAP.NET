@@ -470,7 +470,7 @@ namespace WorldDirect.CoAP
                 {
                     if (attr.Name.Equals(attrToAdd.Name))
                     {
-                            log.LogDebug("Found existing singleton attribute: " + attr.Name);
+                            log?.LogDebug("Found existing singleton attribute: " + attr.Name);
                         return false;
                     }
                 }

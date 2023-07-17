@@ -34,7 +34,7 @@ namespace WorldDirect.CoAP.Deduplication
             else if (!String.Equals(NoopDeduplicator, type, StringComparison.OrdinalIgnoreCase)
                 && !String.Equals("NO_DEDUPLICATOR", type, StringComparison.OrdinalIgnoreCase))
             {
-                    log.LogWarning("Unknown deduplicator type: " + type);
+                    log?.LogWarning("Unknown deduplicator type: " + type);
             }
             return new NoopDeduplicator();
         }

@@ -142,11 +142,11 @@ namespace WorldDirect.CoAP.Net
             }
             catch
             {
-                log.LogWarning("Cannot start secure endpoint at " + this.channel.LocalEndPoint);
+                log?.LogWarning("Cannot start secure endpoint at " + this.channel.LocalEndPoint);
                 Stop();
                 throw;
             }
-            log.LogDebug("Starting secure endpoint bound to " + this.channel.LocalEndPoint);
+            log?.LogDebug("Starting secure endpoint bound to " + this.channel.LocalEndPoint);
         }
 
         /// <inheritdoc/>
@@ -155,7 +155,7 @@ namespace WorldDirect.CoAP.Net
             if (System.Threading.Interlocked.Exchange(ref _running, 0) == 0)
                 return;
 
-            log.LogDebug("Stopping secure endpoint bound to " + this.LocalEndPoint);
+            log?.LogDebug("Stopping secure endpoint bound to " + this.LocalEndPoint);
             this.channel.Stop();
             _matcher.Stop();
             _matcher.Clear();
@@ -211,7 +211,7 @@ namespace WorldDirect.CoAP.Net
                 {
                     if (decoder.IsReply)
                     {
-                        log.LogWarning("Message format error caused by " + e.EndPoint);
+                        log?.LogWarning("Message format error caused by " + e.EndPoint);
                     }
                     else
                     {
@@ -223,7 +223,7 @@ namespace WorldDirect.CoAP.Net
                         Fire(SendingEmptyMessage, rst);
                         this.channel.Send(Serialize(rst), e.EndPoint);
 
-                        log.LogWarning("Message format error caused by " + e.EndPoint + " and reseted.");
+                        log?.LogWarning("Message format error caused by " + e.EndPoint + " and reseted.");
                     }
                     return;
                 }
@@ -261,7 +261,7 @@ namespace WorldDirect.CoAP.Net
                     }
                     else if (response.Type != MessageType.ACK)
                     {
-                        log.LogDebug("Rejecting unmatchable response from " + e.EndPoint);
+                        log?.LogDebug("Rejecting unmatchable response from " + e.EndPoint);
                         Reject(response);
                     }
                 }
@@ -278,7 +278,7 @@ namespace WorldDirect.CoAP.Net
                     // CoAP Ping
                     if (message.Type == MessageType.CON || message.Type == MessageType.NON)
                     {
-                        log.LogDebug("Responding to ping by " + e.EndPoint);
+                        log?.LogDebug("Responding to ping by " + e.EndPoint);
                         Reject(message);
                     }
                     else
@@ -294,7 +294,7 @@ namespace WorldDirect.CoAP.Net
             }
             else
             {
-                log.LogDebug("Silently ignoring non-CoAP message from " + e.EndPoint);
+                log?.LogDebug("Silently ignoring non-CoAP message from " + e.EndPoint);
             }
         }
 

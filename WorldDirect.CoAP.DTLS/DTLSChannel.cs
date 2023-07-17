@@ -8,6 +8,8 @@
     using System.Text;
     using System.Threading.Tasks;
     using Microsoft.Extensions.Caching.Memory;
+    using Microsoft.Extensions.Logging;
+    using WorldDirect.CoAP.Log;
 
     /// <summary>
     /// Represents the dtls channel for a coap communication.
@@ -16,6 +18,7 @@
     {
         private readonly UDPChannel channel;
         private readonly DTLSSessionManager sessionManager;
+        private readonly ILogger<DTLSChannel> logger = LogManager.GetLogger<DTLSChannel>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DTLSChannel"/> class.
@@ -82,11 +85,13 @@
         /// <inheritdoc />
         public void Send(byte[] data, EndPoint ep)
         {
+            this.logger.LogTrace("Sending {Bytes} udp bytes to {Remote}", data.Length, ep);
             this.sessionManager.SendTo(data, ep);
         }
 
         private void DecryptedForwarding(object? sender, DTLSDataReceivedEventArgs e)
         {
+            this.logger.LogTrace("Received {Bytes} decrypted bytes from {Remote}", e.Data.Length, e.EndPoint);
             this.DataReceived?.Invoke(this, e);
             this.DtlsDataReceived?.Invoke(this, e);
         }

@@ -62,7 +62,7 @@ internal class UdpTransport : DatagramTransport
     /// <returns>The amount of received bytes.</returns>
     public int Receive(Span<byte> buffer, int waitMillis)
     {
-        if (this.sema.Wait(TimeSpan.FromMilliseconds(waitMillis)))
+        if (this.sema.WaitAsync(waitMillis).GetAwaiter().GetResult())
         {
             if (this.messages.TryDequeue(out var rx))
             {

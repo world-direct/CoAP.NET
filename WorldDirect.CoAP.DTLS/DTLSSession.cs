@@ -12,19 +12,16 @@ using WorldDirect.CoAP.Net;
 
 internal class DTLSSession
 {
-    private readonly CancellationTokenSource cts;
     private readonly DTLSSessionConfig config;
     private readonly UdpTransport transport;
     private readonly DtlsServerProtocol protocol;
     private readonly DTLSServer dtlsServer;
     private DtlsTransport? dtlsTransport;
-    private Task? HandshakeTask;
     private bool HandshakeFailed = false;
     private readonly ILogger<DTLSSession> logger;
 
-    public DTLSSession(IUDPSender sender, DTLSServer server, EndPoint remote, CancellationTokenSource cts, DTLSSessionConfig config)
+    public DTLSSession(IUDPSender sender, DTLSServer server, EndPoint remote, DTLSSessionConfig config)
     {
-        this.cts = cts;
         this.config = config;
         this.transport = new UdpTransport(sender, remote, config.MaxPacketLength);
         this.protocol = new DtlsServerProtocol();
@@ -45,22 +42,12 @@ internal class DTLSSession
     public event EventHandler<HandshakeFinishedEventArgs>? HandshakeFinished;
 
     /// <summary>
-    /// Cancel the task which handles the the received data.
-    /// </summary>
-    public void Cancel()
-    {
-        this.cts.Cancel();
-    }
-
-    /// <summary>
     /// Start the task which handles the received data.
     /// </summary>
     public void Start()
     {
-        var th = new Thread(async () => await this.HandleSession());
-        th.Start();
         // perform handshake asynchronously, would be blocking otherwise
-        //Task.Run(async () => await this.HandleSession().ConfigureAwait(false));
+        Task.Factory.StartNew(this.HandleSession, TaskCreationOptions.LongRunning).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -91,7 +78,7 @@ internal class DTLSSession
             var length = 0;
             try
             {
-                length = this.dtlsTransport!.Receive(rxBuffer, 1000);
+                length = this.dtlsTransport!.Receive(rxBuffer, 1);
             }
             catch(Exception ex)
             {
@@ -122,7 +109,7 @@ internal class DTLSSession
         }
     }
 
-    private Task HandleSession()
+    private void HandleSession()
     {
         try
         {
@@ -149,7 +136,5 @@ internal class DTLSSession
         {
             this.HandshakeFinished?.Invoke(this, new HandshakeFinishedEventArgs() { Successful = !this.HandshakeFailed });
         }
-
-        return Task.CompletedTask;
     }
 }

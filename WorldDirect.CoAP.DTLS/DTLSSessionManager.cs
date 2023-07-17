@@ -20,7 +20,6 @@
         private readonly IUDPSender sender;
         private readonly IDTLSFactory factory;
         private readonly DTLSSessionConfig config;
-        private readonly CancellationTokenSource cts;
         private readonly ILogger<DTLSSessionManager> log = LogManager.GetLogger<DTLSSessionManager>();
 
         /// <summary>
@@ -34,7 +33,6 @@
             this.sender = sender;
             this.factory = factory;
             this.config = config;
-            this.cts = new CancellationTokenSource();
         }
 
         /// <summary>
@@ -64,7 +62,7 @@
         /// </summary>
         public void Stop()
         {
-            this.cts.Cancel();
+            
         }
 
         /// <summary>
@@ -83,7 +81,7 @@
                 };
                 entry.PostEvictionCallbacks.Add(callback);
 
-                var s = new DTLSSession(this.sender, this.factory.CreateServer(), endPoint, CancellationTokenSource.CreateLinkedTokenSource(this.cts.Token), this.config);
+                var s = new DTLSSession(this.sender, this.factory.CreateServer(), endPoint, this.config);
                 s.DataReceived += DecryptedReceived;
                 s.HandshakeFinished += HandshakeFinished;
                 this.log.LogInformation("Start DTLS connection with {Remote}", endPoint);
@@ -112,7 +110,6 @@
         {
             var obj = value as DTLSSession;
             LogManager.GetLogger<DTLSSessionManager>().LogDebug("Session with {Remote} timed out", obj.Remote);
-            obj?.Cancel();
         }
     }
 }

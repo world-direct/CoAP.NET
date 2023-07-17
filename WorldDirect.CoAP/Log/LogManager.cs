@@ -12,6 +12,7 @@
 namespace WorldDirect.CoAP.Log
 {
     using System;
+    using System.Runtime.CompilerServices;
     using Microsoft.Extensions.Logging;
 
     /// <summary>
