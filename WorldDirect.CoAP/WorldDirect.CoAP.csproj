@@ -2,13 +2,14 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Version>0.5.7</Version>
+    <Version>0.6.0-alpha</Version>
     <Company>World-Direct eBusiness solutions GmbH</Company>
     <Copyright>2021</Copyright>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageIcon>packageIcon.png</PackageIcon>
     <RepositoryUrl>https://github.com/world-direct/CoAP.NET</RepositoryUrl>
     <Description>Changelog:
+        v0.6.0: adaption of logging
         v0.5.7: Bugfix blockwise transfer
         v0.5.6: Add progress reporting on long running Put
         v0.5.5: Bugfix Stackoverflow

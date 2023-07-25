@@ -1,19 +1,45 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <Version>0.6.0-alpha</Version>
+        <Company>World-Direct eBusiness solutions GmbH</Company>
+        <Copyright>2023</Copyright>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageIcon>packageIcon.png</PackageIcon>
+        <RepositoryUrl>https://github.com/world-direct/CoAP.NET</RepositoryUrl>
+        <Description>
+            Changelog:
+        </Description>
+    </PropertyGroup>
+    <PropertyGroup>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+    <ItemGroup>
+        <None Include="..\.nuget\icon.png" Link="icon.png">
+            <PackagePath></PackagePath>
+            <Pack>True</Pack>
+        </None>
+        <None Include="..\LICENSE" Link="LICENSE">
+            <PackagePath></PackagePath>
+            <Pack>True</Pack>
+        </None>
+        <None Include="..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath></PackagePath>
+        </None>
+        <None Include="..\packageIcon.png">
+            <Pack>True</Pack>
+            <PackagePath></PackagePath>
+        </None>
+    </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.2.1" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="6.0.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\WorldDirect.CoAP\WorldDirect.CoAP.csproj" />
   </ItemGroup>
 
 </Project>
