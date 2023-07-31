@@ -60,16 +60,19 @@
 
             foreach (var listenEndpoint in options.ListenOptions)
             {
-                if (listenEndpoint!.EndpointConfig.CertificateConfig == null)
+                if (listenEndpoint!.EndpointConfig.CertificateConfig == null && !listenEndpoint.EndpointConfig.Url.StartsWith("coaps"))
                 {
                     // insecure
                     server.AddEndPoint(listenEndpoint.Endpoint as IPEndPoint);
                 }
                 else
                 {
-                    var dtlsServerBuilder = new DTLSServerBuilder()
-                        .SetCertificate(listenEndpoint.EndpointConfig.CertificateConfig)
-                        .SetHandshakeTimeout(listenEndpoint.EndpointConfig.HandshakeTimeout);
+                    var dtlsServerBuilder = new DTLSServerConfigBuilder();
+                    if (listenEndpoint.EndpointConfig.CertificateConfig != null)
+                    {
+                        dtlsServerBuilder.SetCertificate(listenEndpoint.EndpointConfig.CertificateConfig);
+                    }
+                    dtlsServerBuilder.SetHandshakeTimeout(listenEndpoint.EndpointConfig.HandshakeTimeout);
                     var resolver = serviceProvider.GetService<PskIdentityManagerResolver>();
                     if (resolver != null)
                     {
@@ -96,7 +99,7 @@
                     channel.SendBufferSize = config.ChannelSendBufferSize;
                     channel.ReceivePacketSize = config.ChannelReceivePacketSize;
 
-                    var ep = new CoAPSEndpoint(serviceProvider.GetRequiredService<IMemoryCache>(), new DTLSFactory(dtlsServerBuilder), channel, config);
+                    var ep = new CoAPSEndpoint(serviceProvider.GetRequiredService<IMemoryCache>(), dtlsServerBuilder.Config, channel, config);
 
                     server.AddEndPoint(ep);
                 }

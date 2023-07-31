@@ -9,6 +9,7 @@
     using Microsoft.Extensions.Logging;
     using Org.BouncyCastle.Asn1.Nist;
     using Org.BouncyCastle.Asn1.X509;
+    using Org.BouncyCastle.Tls.Crypto.Impl.BC;
     using WorldDirect.CoAP.Log;
 
     /// <summary>
@@ -18,7 +19,7 @@
     {
         private readonly IMemoryCache cache;
         private readonly IUDPSender sender;
-        private readonly IDTLSFactory factory;
+        private readonly DTLSServerConfig dtlsServerConfig;
         private readonly DTLSSessionConfig config;
         private readonly ILogger<DTLSSessionManager> log = LogManager.GetLogger<DTLSSessionManager>();
 
@@ -26,12 +27,14 @@
         /// Initializes a new instance of the <see cref="DTLSSessionManager"/> class.
         /// </summary>
         /// <param name="cache">A cache to store the sessions.</param>
+        /// <param name="sender">An object to send udp packets.</param>
+        /// <param name="dtlsServerConfig">The configuration of the dtls server.</param>
         /// <param name="config">The configuration for the sessions.</param>
-        public DTLSSessionManager(IMemoryCache cache, IUDPSender sender, IDTLSFactory factory, DTLSSessionConfig config)
+        public DTLSSessionManager(IMemoryCache cache, IUDPSender sender, DTLSServerConfig dtlsServerConfig, DTLSSessionConfig config)
         {
             this.cache = cache;
             this.sender = sender;
-            this.factory = factory;
+            this.dtlsServerConfig = dtlsServerConfig;
             this.config = config;
         }
 
@@ -81,7 +84,7 @@
                 };
                 entry.PostEvictionCallbacks.Add(callback);
 
-                var s = new DTLSSession(this.sender, this.factory.CreateServer(), endPoint, this.config);
+                var s = new DTLSSession(this.sender, new DTLSServer(this.dtlsServerConfig), endPoint, this.config);
                 s.DataReceived += DecryptedReceived;
                 s.HandshakeFinished += HandshakeFinished;
                 this.log.LogInformation("Start DTLS connection with {Remote}", endPoint);

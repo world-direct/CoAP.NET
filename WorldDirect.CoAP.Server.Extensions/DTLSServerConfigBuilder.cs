@@ -10,17 +10,20 @@ using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Tls;
 using Org.BouncyCastle.Tls.Crypto.Impl.BC;
 
-public class DTLSServerBuilder
+public class DTLSServerConfigBuilder
 {
     // TODO: Check if certificate usage is allowed for server auth when loaded from files
     // TODO: Check if CA is allowed to be used for (KeyCertSign) when loaded from file
     private readonly BcTlsCrypto crypto;
-    private readonly DTLSServerConfig config;
-    public DTLSServerBuilder()
+    private readonly MutableDTLSServerConfig config;
+    public DTLSServerConfigBuilder()
     {
         this.crypto = new BcTlsCrypto(new SecureRandom());
-        this.config = new DTLSServerConfig();
+        this.config = new MutableDTLSServerConfig();
+        this.config.Crypto = this.crypto;
     }
+
+    public DTLSServerConfig Config => new (this.config);
 
     /// <summary>
     /// Loads the servers certificate based on the configuration settings.
@@ -28,7 +31,7 @@ public class DTLSServerBuilder
     /// <param name="config">The settings to identify the certificate.</param>
     /// <returns></returns>
     /// <exception cref="InvalidOperationException"></exception>
-    public DTLSServerBuilder SetCertificate(CertificateConfig config)
+    public DTLSServerConfigBuilder SetCertificate(CertificateConfig config)
     {
         if (config.IsFromStore)
         {
@@ -71,7 +74,7 @@ public class DTLSServerBuilder
         return this;
     }
 
-    public DTLSServerBuilder AddCA(CertificateConfig config)
+    public DTLSServerConfigBuilder AddCA(CertificateConfig config)
     {
         if (config.IsFromStore)
         {
@@ -110,24 +113,18 @@ public class DTLSServerBuilder
         return this;
     }
 
-    public DTLSServerBuilder SetHandshakeTimeout(TimeSpan timeout)
+    public DTLSServerConfigBuilder SetHandshakeTimeout(TimeSpan timeout)
     {
         this.config.HandshakeTimeout = timeout;
         return this;
     }
 
-    public DTLSServerBuilder SetPskManager(TlsPskIdentityManager manager)
+    public DTLSServerConfigBuilder SetPskManager(TlsPskIdentityManager manager)
     {
         this.config.PskManager = manager;
         this.config.CipherSuites.Add(CipherSuite.TLS_PSK_WITH_AES_128_CCM_8);
         this.config.CipherSuites.Add(CipherSuite.TLS_PSK_WITH_AES_128_CBC_SHA256);
         return this;
-    }
-
-
-    public DTLSServer Build()
-    {
-        return new DTLSServer(this.crypto, this.config);
     }
 
     private Org.BouncyCastle.X509.X509Certificate LoadCertFromFile(string filename)

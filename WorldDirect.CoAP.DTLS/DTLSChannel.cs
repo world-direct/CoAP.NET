@@ -25,14 +25,14 @@
         /// </summary>
         /// <param name="channel">The underlying udp channel used to send/receive data.</param>
         /// <param name="cache">The cache to store dtls sessions.</param>
-        /// <param name="factory">The factory to create dtls server.</param>
+        /// <param name="dtlsConfig">The configuration of the dtls server.</param>
         /// <param name="sessionTimeout">The timeout after which a session is deleted.</param>
-        public DTLSChannel(UDPChannel channel, IMemoryCache cache, IDTLSFactory factory, TimeSpan sessionTimeout)
+        public DTLSChannel(UDPChannel channel, IMemoryCache cache, DTLSServerConfig dtlsConfig, TimeSpan sessionTimeout)
         {
             this.channel = channel;
             this.channel.DataReceived += DtlsReceived;
             var config = new DTLSSessionConfig() { MaxPacketLength = channel.ReceivePacketSize, SessionTimeout = sessionTimeout, };
-            this.sessionManager = new DTLSSessionManager(cache, new UdpChannelSender(channel), factory, config);
+            this.sessionManager = new DTLSSessionManager(cache, new UdpChannelSender(channel), dtlsConfig, config);
         }
 
         /// <summary>
@@ -40,9 +40,9 @@
         /// </summary>
         /// <param name="channel">The underlying udp channel used to send/receive data.</param>
         /// <param name="cache">The cache to store dtls sessions.</param>
-        /// <param name="factory">The factory to create dtls server.</param>
-        public DTLSChannel(UDPChannel channel, IMemoryCache cache, IDTLSFactory factory)
-        : this(channel, cache, factory, TimeSpan.FromMinutes(2))
+        /// <param name="dtlsConfig">The configuration of the dtls server.</param>
+        public DTLSChannel(UDPChannel channel, IMemoryCache cache, DTLSServerConfig dtlsConfig)
+        : this(channel, cache, dtlsConfig, TimeSpan.FromMinutes(2))
         {
         }
 

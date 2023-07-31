@@ -19,7 +19,7 @@ public class DTLSServer : AbstractTlsServer
     /// </summary>
     /// <param name="crypto">The cryptostack.</param>
     /// <param name="config">The configuration of the server.</param>
-    public DTLSServer(BcTlsCrypto crypto, DTLSServerConfig config) : base(crypto)
+    public DTLSServer(DTLSServerConfig config) : base(config.Crypto)
     {
         this.config = config;
         this.IsAuthenticated = false;
