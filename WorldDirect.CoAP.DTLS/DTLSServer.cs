@@ -1,9 +1,11 @@
 ﻿namespace WorldDirect.CoAP.DTLS;
 
+using System.Runtime.CompilerServices;
 using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.Pkix;
 using Org.BouncyCastle.Tls;
 using Org.BouncyCastle.Tls.Crypto;
+using Org.BouncyCastle.Tls.Crypto.Impl;
 using Org.BouncyCastle.Tls.Crypto.Impl.BC;
 using Org.BouncyCastle.X509;
 
@@ -17,7 +19,6 @@ public class DTLSServer : AbstractTlsServer
     /// <summary>
     /// Initializes a new instance of the <see cref="DTLSServer"/> class.
     /// </summary>
-    /// <param name="crypto">The cryptostack.</param>
     /// <param name="config">The configuration of the server.</param>
     public DTLSServer(DTLSServerConfig config) : base(config.Crypto)
     {
@@ -45,6 +46,9 @@ public class DTLSServer : AbstractTlsServer
         }
     }
 
+    /// <summary>
+    /// Gets the used PSK identity of the remote.
+    /// </summary>
     public byte[] PskIdentity { get; private set; } = Array.Empty<byte>();
 
     /// <summary>
@@ -80,6 +84,14 @@ public class DTLSServer : AbstractTlsServer
         {
             this.PskIdentity = this.m_context.SecurityParameters.PskIdentity;
             this.IsAuthenticated = true;
+        }
+        if (this.config.KeyStore != null)
+        {
+            var keyData = DTLS12KeyFileData.FromSecret(this.m_context.SecurityParameters.ClientRandom, this.m_context.SecurityParameters.MasterSecret);
+            if (keyData != null)
+            {
+                this.config.KeyStore.Store(keyData.Value);
+            }
         }
     }
 

@@ -3,7 +3,7 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <Version>0.6.1-alpha</Version>
+        <Version>0.6.2-alpha</Version>
         <Company>World-Direct eBusiness solutions GmbH</Company>
         <Copyright>2023</Copyright>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -11,6 +11,7 @@
         <RepositoryUrl>https://github.com/world-direct/CoAP.NET</RepositoryUrl>
         <Description>
             Changelog:
+                v0.6.2: add session key file exporter
                 v0.6.1: adapt interface to interact with DTLS configuration
         </Description>
     </PropertyGroup>

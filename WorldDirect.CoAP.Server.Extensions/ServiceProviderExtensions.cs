@@ -9,6 +9,7 @@
     using System.Threading.Tasks;
     using Channel;
     using Configuration;
+    using DTLS;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
@@ -81,6 +82,12 @@
                         {
                             dtlsServerBuilder.SetPskManager(pskManager);
                         }
+                    }
+
+                    var keyStore = serviceProvider.GetService<IKeyStore>();
+                    if (keyStore != null)
+                    {
+                        dtlsServerBuilder.EnableExportOfSessionKeys(keyStore);
                     }
 
                     foreach (var ca in listenEndpoint.EndpointConfig.ClientCAs)

@@ -119,6 +119,18 @@ public class DTLSServerConfigBuilder
         return this;
     }
 
+    /// <summary>
+    /// Add an exporter of the session keys.
+    /// </summary>
+    /// <remarks>ATTENTION!! will export session keys. Only use in development.</remarks>
+    /// <param name="store">The store where the keys should be exported.</param>
+    /// <returns>The builder.</returns>
+    public DTLSServerConfigBuilder EnableExportOfSessionKeys(IKeyStore store)
+    {
+        this.config.KeyStore = store;
+        return this;
+    }
+
     public DTLSServerConfigBuilder SetPskManager(TlsPskIdentityManager manager)
     {
         this.config.PskManager = manager;
