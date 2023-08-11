@@ -12,6 +12,7 @@
 namespace WorldDirect.CoAP.Server.Resources
 {
     using System;
+    using System.Diagnostics;
     using Net;
 
     /// <summary>
@@ -43,6 +44,8 @@ namespace WorldDirect.CoAP.Server.Resources
         {
             return this._exchange.Get<T>(key);
         }
+
+        public Activity Activity => this._exchange.Activity;
 
         /// <summary>
         /// Gets the request.

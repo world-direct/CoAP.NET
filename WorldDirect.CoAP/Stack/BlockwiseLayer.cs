@@ -242,6 +242,7 @@ namespace WorldDirect.CoAP.Stack
             {
                 if (block1 != null)
                     response.SetOption(block1);
+                exchange.Request.Response = response;
                 exchange.CurrentResponse = response;
                 // Block1 transfer completed
                 ClearBlockCleanup(exchange);
