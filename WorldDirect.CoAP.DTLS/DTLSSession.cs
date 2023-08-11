@@ -1,5 +1,6 @@
 ﻿namespace WorldDirect.CoAP.DTLS;
 
+using System;
 using System.Data;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
@@ -78,7 +79,14 @@ internal class DTLSSession
             var length = 0;
             try
             {
-                length = this.dtlsTransport!.Receive(rxBuffer, 1);
+                do
+                {
+                    length = this.dtlsTransport!.Receive(rxBuffer, 1);
+                    if (length > 0)
+                    {
+                        this.InvokeDataReceived(rxBuffer.Take(length).ToArray());
+                    }
+                } while (length > 0);
             }
             catch(Exception ex)
             {
@@ -87,25 +95,30 @@ internal class DTLSSession
 
             if (length > 0)
             {
-                if (this.dtlsServer.IsAuthenticated)
-                {
-                    if (this.dtlsServer.PeerCertificate != null)
-                    {
-                        var peerCert = new X509Certificate(this.dtlsServer.PeerCertificate.GetEncoded());
-                        this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(rxBuffer.Take(length).ToArray(), this.transport.Remote, peerCert));
-                    }
-                    else if (this.dtlsServer.PskIdentity.Any())
-                    {
-                        this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(rxBuffer.Take(length).ToArray(), this.transport.Remote, Encoding.ASCII.GetString(this.dtlsServer.PskIdentity)));
-                    }
-                }
-                else
-                {
-                    throw new NotImplementedException($"Unauthenticated communication is not implemented");
-                }
+                
                 
             }
             
+        }
+    }
+
+    private void InvokeDataReceived(byte[] payload)
+    {
+        if (this.dtlsServer.IsAuthenticated)
+        {
+            if (this.dtlsServer.PeerCertificate != null)
+            {
+                var peerCert = new X509Certificate(this.dtlsServer.PeerCertificate.GetEncoded());
+                this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(payload, this.transport.Remote, peerCert));
+            }
+            else if (this.dtlsServer.PskIdentity.Any())
+            {
+                this.DataReceived?.Invoke(this, new DTLSDataReceivedEventArgs(payload, this.transport.Remote, Encoding.ASCII.GetString(this.dtlsServer.PskIdentity)));
+            }
+        }
+        else
+        {
+            throw new NotImplementedException($"Unauthenticated communication is not implemented");
         }
     }
 
