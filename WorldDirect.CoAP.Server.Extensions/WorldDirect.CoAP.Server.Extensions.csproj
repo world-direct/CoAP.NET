@@ -4,16 +4,17 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-      <Version>0.6.2-beta</Version>
+      <Version>0.6.3-alpha</Version>
       <Company>World-Direct eBusiness solutions GmbH</Company>
       <Copyright>2023</Copyright>
       <PackageLicenseFile>LICENSE</PackageLicenseFile>
       <PackageIcon>packageIcon.png</PackageIcon>
       <RepositoryUrl>https://github.com/world-direct/CoAP.NET</RepositoryUrl>
       <Description>
-          Changelog:
-            v0.6.2: add ssl keyfile for extraction of session keys
-            v0.6.1: adapt to easier configuration of dtls
+        Changelog:
+        v0.6.3: add tracing diagnostics
+        v0.6.2: add ssl keyfile for extraction of session keys
+        v0.6.1: adapt to easier configuration of dtls
       </Description>
   </PropertyGroup>
 
