@@ -30,7 +30,7 @@ namespace WorldDirect.CoAP.Net
     {
         private readonly ConcurrentDictionary<Object, Object> _attributes = new ConcurrentDictionary<Object, Object>();
         private readonly Origin _origin;
-        private readonly Activity activity;
+        private Activity activity;
         private Boolean _timedOut;
         private Request _request;
         private Request _currentRequest;
@@ -217,6 +217,8 @@ namespace WorldDirect.CoAP.Net
                 if (value)
                 {
                     Completed?.Invoke(this, EventArgs.Empty);
+                    this.Activity?.Stop();
+                    this.activity = null;
                 }
             }
         }

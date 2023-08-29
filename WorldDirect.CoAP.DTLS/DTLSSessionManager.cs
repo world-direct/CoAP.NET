@@ -89,6 +89,7 @@
                 s.HandshakeFinished += HandshakeFinished;
                 this.log.LogInformation("Start DTLS connection with {Remote}", endPoint);
                 s.Start();
+                DTLSMetrics.Log.SessionAdded();
                 return s;
             });
 
@@ -100,6 +101,7 @@
             var session = (sender as DTLSSession)!;
             if (!e.Successful)
             {
+                DTLSMetrics.Log.HandshakeFailed();
                 this.cache.Remove(session.Remote.ToString());
             }
         }
@@ -113,6 +115,7 @@
         {
             var obj = value as DTLSSession;
             LogManager.GetLogger<DTLSSessionManager>().LogDebug("Session with {Remote} timed out", obj.Remote);
+            DTLSMetrics.Log.SessionRemoved();
         }
     }
 }

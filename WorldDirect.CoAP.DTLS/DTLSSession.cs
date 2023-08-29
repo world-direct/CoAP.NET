@@ -76,7 +76,7 @@ internal class DTLSSession
         if (dtlsTransport != null)
         {
             var rxBuffer = new byte[this.config.MaxPacketLength];
-            var length = 0;
+            int length;
             try
             {
                 do
@@ -91,12 +91,6 @@ internal class DTLSSession
             catch(Exception ex)
             {
                 this.logger.LogTrace(ex, "Cant receive decrypted dtls packet from {Remote}", this.Remote);
-            }
-
-            if (length > 0)
-            {
-                
-                
             }
             
         }
@@ -133,7 +127,7 @@ internal class DTLSSession
         catch (TlsTimeoutException e)
         {
             this.HandshakeFailed = true;
-            this.logger.LogError(e, "{Remote} failed handshake because of timeout", this.Remote);
+            this.logger.LogError(e, "{Remote} failed handshake because of timeout ({Timeout})", this.Remote, this.config.HandshakeTimeout);
         }
         catch (TlsFatalAlert e)
         {

@@ -14,4 +14,9 @@ public class DTLSSessionConfig
     /// Gets or sets the maximum packet length of a udp payload.
     /// </summary>
     public int MaxPacketLength { get; set; }
+
+    /// <summary>
+    /// Gets or sets the maximum duration of a handshake.
+    /// </summary>
+    public TimeSpan HandshakeTimeout { get; set; }
 }

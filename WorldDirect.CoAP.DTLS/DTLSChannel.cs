@@ -31,7 +31,7 @@
         {
             this.channel = channel;
             this.channel.DataReceived += DtlsReceived;
-            var config = new DTLSSessionConfig() { MaxPacketLength = channel.ReceivePacketSize, SessionTimeout = sessionTimeout, };
+            var config = new DTLSSessionConfig() { MaxPacketLength = channel.ReceivePacketSize, SessionTimeout = sessionTimeout, HandshakeTimeout = dtlsConfig.HandshakeTimeout,};
             this.sessionManager = new DTLSSessionManager(cache, new UdpChannelSender(channel), dtlsConfig, config);
         }
 

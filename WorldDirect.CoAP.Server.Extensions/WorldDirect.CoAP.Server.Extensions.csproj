@@ -4,7 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-      <Version>0.6.3-alpha</Version>
+      <Version>0.6.3-alpha4</Version>
       <Company>World-Direct eBusiness solutions GmbH</Company>
       <Copyright>2023</Copyright>
       <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -49,6 +49,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WorldDirect.CoAP.DTLS\WorldDirect.CoAP.DTLS.csproj" />
+    <ProjectReference Include="..\WorldDirect.CoAP\WorldDirect.CoAP.csproj" />
   </ItemGroup>
 
 </Project>
