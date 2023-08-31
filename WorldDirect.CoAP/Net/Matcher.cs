@@ -336,7 +336,7 @@ namespace WorldDirect.CoAP.Net
                 }
                 else
                 {
-                        log.LogInformation("Ignoring unmatchable piggy-backed response from " + response.Source + ": " + response);
+                        log.LogTrace("Ignoring unmatchable piggy-backed response from " + response.Source + ": " + response);
                 }
                 // ignore response
                 return null;
