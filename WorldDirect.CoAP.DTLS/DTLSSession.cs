@@ -57,7 +57,15 @@ internal class DTLSSession
     /// <param name="payload">The plaintext payload.</param>
     public void Send(ReadOnlySpan<byte> payload)
     {
-        this.dtlsTransport?.Send(payload);
+        lock (this.dtlsTransport!)
+        {
+            if (payload.Length > this.dtlsServer.MaxFragmentLength)
+            {
+                this.logger.LogWarning("Cant send message with {Bytes} bytes to {Remote} because buffer of remote is to small.", payload.Length, this.Remote);
+                return;
+            }
+            this.dtlsTransport?.Send(payload);
+        }
     }
 
     /// <summary>
@@ -75,24 +83,26 @@ internal class DTLSSession
         // if handshake was was performed successfully, decrypt data directly
         if (dtlsTransport != null)
         {
-            var rxBuffer = new byte[this.config.MaxPacketLength];
-            int length;
-            try
+            lock (this.dtlsTransport)
             {
-                do
+                var rxBuffer = new byte[this.config.MaxPacketLength];
+                int length;
+                try
                 {
-                    length = this.dtlsTransport!.Receive(rxBuffer, 1);
-                    if (length > 0)
+                    do
                     {
-                        this.InvokeDataReceived(rxBuffer.Take(length).ToArray());
-                    }
-                } while (length > 0);
+                        length = this.dtlsTransport!.Receive(rxBuffer, 1);
+                        if (length > 0)
+                        {
+                            this.InvokeDataReceived(rxBuffer.Take(length).ToArray());
+                        }
+                    } while (length > 0);
+                }
+                catch (Exception ex)
+                {
+                    this.logger.LogTrace(ex, "Cant receive {Bytes} decrypted bytes from {Remote}", payload.Length, this.Remote);
+                }
             }
-            catch(Exception ex)
-            {
-                this.logger.LogTrace(ex, "Cant receive decrypted dtls packet from {Remote}", this.Remote);
-            }
-            
         }
     }
 
@@ -122,7 +132,7 @@ internal class DTLSSession
         {
             // perform handshake
             this.dtlsTransport = this.protocol.Accept(this.dtlsServer, this.transport);
-            this.logger.LogInformation("{Remote} finished handshake successfully", this.Remote);
+            this.logger.LogInformation("Finished handshake with {Remote} successfully", this.Remote);
         }
         catch (TlsTimeoutException e)
         {

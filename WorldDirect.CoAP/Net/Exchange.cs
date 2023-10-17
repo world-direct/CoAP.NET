@@ -30,7 +30,6 @@ namespace WorldDirect.CoAP.Net
     {
         private readonly ConcurrentDictionary<Object, Object> _attributes = new ConcurrentDictionary<Object, Object>();
         private readonly Origin _origin;
-        private Activity activity;
         private Boolean _timedOut;
         private Request _request;
         private Request _currentRequest;
@@ -53,60 +52,12 @@ namespace WorldDirect.CoAP.Net
             _origin = origin;
             _currentRequest = request;
             _timestamp = DateTime.Now;
-            if (origin == Origin.Local)
-            {
-                this.activity = Tracing.ClientSource.StartActivity("CoAP Request");
-            }
-            else
-            {
-                Activity.Current = null;
-                this.activity = Tracing.ServerSource.CreateActivity("CoAP Request", ActivityKind.Server);
-                this.activity?.Start();
-            }
-            this.activity?.AddTag("coap.method", request.Method);
-            this.activity?.AddTag("coap.uri", request.URI);
-            this.activity?.AddTag("coap.resource", request.UriPath);
-            if (origin == Origin.Local)
-            {
-                this.activity?.AddTag("coap.remote", request.Destination);
-            }
-
-            request.Retransmitting += (obj, ev) => this.activity?.AddEvent(new ActivityEvent("Retransmitting"));
-            request.Respond += (obj, ev) =>
-            {
-                this.activity?.AddTag("coap.statuscode", ev.Response.StatusCode);
-                this.activity?.Stop();
-            };
-            request.TimedOut += (obj, ev) =>
-            {
-                this.activity?.AddTag("coap.statuscode", "TIMEOUT");
-                this.activity?.Stop();
-            };
-            request.Rejected += (obj, ev) =>
-            {
-                this.activity?.AddTag("coap.statuscode", "REJECTED");
-                this.activity?.Stop();
-            };
-            request.Responding += (obj, ev) =>
-            {
-                var response = ev.Response;
-                if (response.Block1 != null)
-                {
-                    this.activity?.AddEvent(new ActivityEvent($"New Block {ev.Response.Block1?.NUM}"));
-                }
-                else if (response.Block2 != null)
-                {
-                    this.activity?.AddEvent(new ActivityEvent($"New Block {ev.Response.Block2?.NUM}"));
-                }
-            };
         }
 
         public Origin Origin
         {
             get { return _origin; }
         }
-
-        public Activity Activity => this.activity;
 
         /// <summary>
         /// Gets or sets the endpoint which has created and processed this exchange.
@@ -217,8 +168,6 @@ namespace WorldDirect.CoAP.Net
                 if (value)
                 {
                     Completed?.Invoke(this, EventArgs.Empty);
-                    this.Activity?.Stop();
-                    this.activity = null;
                 }
             }
         }

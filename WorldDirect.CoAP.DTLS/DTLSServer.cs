@@ -52,6 +52,34 @@ public class DTLSServer : AbstractTlsServer
     public byte[] PskIdentity { get; private set; } = Array.Empty<byte>();
 
     /// <summary>
+    /// Get the maximum size of a dtls the remote supports.
+    /// </summary>
+    public int? MaxFragmentLength
+    {
+        get
+        {
+            if (this.m_context.SecurityParameters.MaxFragmentLength == 1)
+            {
+                return 512;
+            }
+            if (this.m_context.SecurityParameters.MaxFragmentLength == 2)
+            {
+                return 1024;
+            }
+            if (this.m_context.SecurityParameters.MaxFragmentLength == 3)
+            {
+                return 2048;
+            }
+            if (this.m_context.SecurityParameters.MaxFragmentLength == 4)
+            {
+                return 4096;
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Get the timeout of handshake.
     /// </summary>
     /// <returns>The timeout in milliseconds.</returns>

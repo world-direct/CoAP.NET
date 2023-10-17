@@ -31,7 +31,7 @@
         {
             try
             {
-                using var file = File.Open(this.fileName, FileMode.OpenOrCreate);
+                using var file = File.Open(this.fileName, FileMode.Append);
                 using var stream = new StreamWriter(file);
                 stream.WriteLine($"CLIENT_RANDOM {Convert.ToHexString(data.ClientRandom)} {Convert.ToHexString(data.PreMasterSecret)}");
             }

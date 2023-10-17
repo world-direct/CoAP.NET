@@ -18,6 +18,7 @@ namespace WorldDirect.CoAP.Net
     using Channel;
     using Codec;
     using DTLS;
+    using LazyCache;
     using Log;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
@@ -60,7 +61,7 @@ namespace WorldDirect.CoAP.Net
         /// Instantiates a new endpoint with the
         /// specified channel and configuration.
         /// </summary>
-        public CoAPSEndpoint(IMemoryCache cache, DTLSServerConfig dtlsConfig, ICoapConfig config)
+        public CoAPSEndpoint(IAppCache cache, DTLSServerConfig dtlsConfig, ICoapConfig config)
         {
             _config = config;
             _matcher = new Matcher(this._config);
@@ -74,7 +75,7 @@ namespace WorldDirect.CoAP.Net
             this.DTLSConfig = dtlsConfig;
         }
 
-        public CoAPSEndpoint(IMemoryCache cache, DTLSServerConfig dtlsConfig, UDPChannel channel, ICoapConfig config)
+        public CoAPSEndpoint(IAppCache cache, DTLSServerConfig dtlsConfig, UDPChannel channel, ICoapConfig config)
         {
             _config = config;
             _matcher = new Matcher(this._config);
@@ -199,6 +200,16 @@ namespace WorldDirect.CoAP.Net
             _executor.Start(() => _coapStack.SendEmptyMessage(exchange, message));
         }
 
+        private void ReceiveRequest(Exchange exchange, Request request)
+        {
+            _executor.Start(() => _coapStack.ReceiveRequest(exchange, request));
+        }
+
+        private void ReceiveResponse(Exchange exchange, Response response)
+        {
+            _executor.Start(() => _coapStack.ReceiveResponse(exchange, response));
+        }
+
 
         private void Channel_DataReceived(object? sender, DTLSDataReceivedEventArgs e)
         {
@@ -243,7 +254,7 @@ namespace WorldDirect.CoAP.Net
                     {
                         exchange.EndPoint = this;
                         exchange.Set(nameof(DTLSClientAuthentication), e.ClientAuthentication);
-                        _coapStack.ReceiveRequest(exchange, request);
+                        this.ReceiveRequest(exchange, request);
                     }
                 }
             }
@@ -261,7 +272,7 @@ namespace WorldDirect.CoAP.Net
                     {
                         response.RTT = (DateTime.Now - exchange.Timestamp).TotalMilliseconds;
                         exchange.EndPoint = this;
-                        _coapStack.ReceiveResponse(exchange, response);
+                        this.ReceiveResponse(exchange, response);
                     }
                     else if (response.Type != MessageType.ACK)
                     {

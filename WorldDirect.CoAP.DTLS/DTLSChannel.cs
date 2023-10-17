@@ -7,6 +7,7 @@
     using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
+    using LazyCache;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
     using WorldDirect.CoAP.Log;
@@ -27,7 +28,7 @@
         /// <param name="cache">The cache to store dtls sessions.</param>
         /// <param name="dtlsConfig">The configuration of the dtls server.</param>
         /// <param name="sessionTimeout">The timeout after which a session is deleted.</param>
-        public DTLSChannel(UDPChannel channel, IMemoryCache cache, DTLSServerConfig dtlsConfig, TimeSpan sessionTimeout)
+        public DTLSChannel(UDPChannel channel, IAppCache cache, DTLSServerConfig dtlsConfig, TimeSpan sessionTimeout)
         {
             this.channel = channel;
             this.channel.DataReceived += DtlsReceived;
@@ -41,14 +42,14 @@
         /// <param name="channel">The underlying udp channel used to send/receive data.</param>
         /// <param name="cache">The cache to store dtls sessions.</param>
         /// <param name="dtlsConfig">The configuration of the dtls server.</param>
-        public DTLSChannel(UDPChannel channel, IMemoryCache cache, DTLSServerConfig dtlsConfig)
+        public DTLSChannel(UDPChannel channel, IAppCache cache, DTLSServerConfig dtlsConfig)
         : this(channel, cache, dtlsConfig, TimeSpan.FromMinutes(2))
         {
         }
 
         private void DtlsReceived(object? sender, DataReceivedEventArgs e)
         {
-            this.sessionManager.ReceivedUdpPacket(e.Data, e.EndPoint);
+            Task.Factory.StartNew(() => this.sessionManager.ReceivedUdpPacket(e.Data, e.EndPoint)).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -85,7 +86,7 @@
         /// <inheritdoc />
         public void Send(byte[] data, EndPoint ep)
         {
-            this.logger.LogTrace("Sending {Bytes} udp bytes to {Remote}", data.Length, ep);
+            this.logger.LogTrace("Sending {Bytes} decrypted bytes to {Remote}", data.Length, ep);
             this.sessionManager.SendTo(data, ep);
         }
 

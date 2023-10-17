@@ -11,8 +11,7 @@ internal class UdpTransport : DatagramTransport
 {
     private readonly IUDPSender sender;
     private readonly int maxPacketLength;
-    private readonly ConcurrentQueue<byte[]> messages = new ();
-    private readonly SemaphoreSlim sema = new (0);
+    private readonly BlockingCollection<byte[]> messages = new ();
 
     /// <summary>
     /// Initialize a new instance of the <see cref="UdpTransport"/> class.
@@ -62,13 +61,10 @@ internal class UdpTransport : DatagramTransport
     /// <returns>The amount of received bytes.</returns>
     public int Receive(Span<byte> buffer, int waitMillis)
     {
-        if (this.sema.WaitAsync(waitMillis).GetAwaiter().GetResult())
+        if (this.messages.TryTake(out var rx, TimeSpan.FromMilliseconds(waitMillis)))
         {
-            if (this.messages.TryDequeue(out var rx))
-            {
-                rx.CopyTo(buffer);
-                return rx.Length > buffer.Length ? buffer.Length : rx.Length;
-            }
+            rx.CopyTo(buffer);
+            return rx.Length > buffer.Length ? buffer.Length : rx.Length;
         }
 
         return 0;
@@ -117,7 +113,6 @@ internal class UdpTransport : DatagramTransport
     /// <param name="payload">The received message.</param>
     internal void Enqueue(ReadOnlySpan<byte> payload)
     {
-        this.messages.Enqueue(payload.ToArray());
-        this.sema.Release();
+        this.messages.Add(payload.ToArray());
     }
 }

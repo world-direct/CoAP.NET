@@ -10,6 +10,7 @@
     using Channel;
     using Configuration;
     using DTLS;
+    using LazyCache;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@
     using Org.BouncyCastle.Ocsp;
     using Org.BouncyCastle.Tls;
     using Org.BouncyCastle.X509;
+    using Threading;
     using WorldDirect.CoAP.Log;
 
     /// <summary>
@@ -37,7 +39,6 @@
         /// Configures a <see cref="CoapServer"/> based on the provided configuration.
         /// </summary>
         /// <remarks>
-        /// If DTLS is used for for encryption a <see cref="IMemoryCache"/> must be provided in the service provider.
         /// If PSKs should be used <see cref="PskIdentityManagerResolver"/> must be added to the ServiceCollection.
         /// </remarks>
         /// <param name="services"></param>
@@ -45,6 +46,7 @@
         /// <returns></returns>
         public static IServiceCollection ConfigureCoAPServer(this IServiceCollection services, IConfiguration configuration)
         {
+            services.AddLazyCache();
             services.AddSingleton(serviceProvider => Configure(serviceProvider, configuration));
 
             return services;
@@ -97,7 +99,15 @@
 
                     var channel = new UDPChannel(listenEndpoint.Endpoint);
                     var config = (CoapConfig)CoapConfig.Default;
-                    config.MaxMessageSize = options.MaxMessageSize;
+                    // config.MaxMessageSize is used to check payload length
+                    // we SHOULD store DTLSServer.MaxFragmentLength in block layer for each client
+                    // to be able to determine how long the longest CoAP Message for a client is
+                    // but this is too much of a refactoring at the moment
+                    // thats why we use some buffer and only support FragmentLength defined by MaxMessageSize
+                    // possible values are 128, 256 and 512
+                    // MaxMessageSize must be set to the least expected FragmentLength of the DTLS Clients
+                    // Otherwise sending request wont work the FragmentLength is not in sync with the Blockwise layer
+                    config.MaxMessageSize = options.MaxMessageSize - 64;
                     if(config.MaxMessageSize <= config.DefaultBlockSize)
                     {
                         config.DefaultBlockSize = config.MaxMessageSize / 2;
@@ -106,8 +116,8 @@
                     channel.SendBufferSize = config.ChannelSendBufferSize;
                     channel.ReceivePacketSize = config.ChannelReceivePacketSize;
 
-                    var ep = new CoAPSEndpoint(serviceProvider.GetRequiredService<IMemoryCache>(), dtlsServerBuilder.Config, channel, config);
-
+                    var ep = new CoAPSEndpoint(serviceProvider.GetRequiredService<IAppCache>(), dtlsServerBuilder.Config, channel, config);
+                    //ep.Executor = new ThreadPoolExecutor();
                     server.AddEndPoint(ep);
                 }
             }

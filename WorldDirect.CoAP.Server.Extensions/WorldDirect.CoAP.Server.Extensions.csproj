@@ -4,7 +4,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-      <Version>0.6.3-alpha4</Version>
+      <Version>0.6.3-alpha21</Version>
       <Company>World-Direct eBusiness solutions GmbH</Company>
       <Copyright>2023</Copyright>
       <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -42,6 +42,7 @@
     </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="LazyCache.AspNetCore" Version="2.4.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
@@ -49,7 +50,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WorldDirect.CoAP.DTLS\WorldDirect.CoAP.DTLS.csproj" />
-    <ProjectReference Include="..\WorldDirect.CoAP\WorldDirect.CoAP.csproj" />
   </ItemGroup>
 
 </Project>

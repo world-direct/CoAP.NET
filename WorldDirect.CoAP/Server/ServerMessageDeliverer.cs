@@ -13,6 +13,7 @@ namespace WorldDirect.CoAP.Server
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using Log;
     using Microsoft.Extensions.Logging;
     using Net;
@@ -45,7 +46,10 @@ namespace WorldDirect.CoAP.Server
         /// <inheritdoc/>
         public void DeliverRequest(Exchange exchange)
         {
+            Activity.Current = null;
+
             Request request = exchange.Request;
+            
             IResource resource = FindResource(request.UriPaths);
             if (resource != null)
             {
@@ -57,6 +61,7 @@ namespace WorldDirect.CoAP.Server
                     executor.Start(() => resource.HandleRequest(exchange));
                 else
                     resource.HandleRequest(exchange);
+
             }
             else
             {

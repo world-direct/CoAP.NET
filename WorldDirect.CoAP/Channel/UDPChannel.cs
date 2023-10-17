@@ -240,6 +240,7 @@ namespace WorldDirect.CoAP.Channel
         {
             if (count > 0)
             {
+                Metrics.Log.BytesReceived(count);
                 Byte[] bytes = new Byte[count];
                 Buffer.BlockCopy(buffer, 0, bytes, 0, count);
 
@@ -310,6 +311,7 @@ namespace WorldDirect.CoAP.Channel
                     }
                 }
 
+                Metrics.Log.BytesTransmitted(raw.Data.Length);
                 BeginSend(socket, raw.Data, remoteEndPoint);
 
             } while (messageDequeued);

@@ -4,6 +4,7 @@
     using System.Net;
     using System.Text;
     using Channel;
+    using LazyCache;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Internal;
     using Microsoft.Extensions.Logging;
@@ -17,7 +18,7 @@
     /// </summary>
     public class DTLSSessionManager
     {
-        private readonly IMemoryCache cache;
+        private readonly IAppCache cache;
         private readonly IUDPSender sender;
         private readonly DTLSServerConfig dtlsServerConfig;
         private readonly DTLSSessionConfig config;
@@ -30,7 +31,7 @@
         /// <param name="sender">An object to send udp packets.</param>
         /// <param name="dtlsServerConfig">The configuration of the dtls server.</param>
         /// <param name="config">The configuration for the sessions.</param>
-        public DTLSSessionManager(IMemoryCache cache, IUDPSender sender, DTLSServerConfig dtlsServerConfig, DTLSSessionConfig config)
+        public DTLSSessionManager(IAppCache cache, IUDPSender sender, DTLSServerConfig dtlsServerConfig, DTLSSessionConfig config)
         {
             this.cache = cache;
             this.sender = sender;
@@ -50,14 +51,15 @@
         /// <param name="endPoint">The remote endpoint.</param>
         public void SendTo(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
-            if(this.cache.TryGetValue<DTLSSession>(endPoint.ToString(), out var session))
+            // cache.TryGetValue does not work (always returns false with null object...)
+            var session = this.cache.Get<DTLSSession>(endPoint.ToString());
+            if (session != null)
             {
                 session.Send(packet);
+                return;
             }
-            else
-            {
-                this.log.LogWarning("Tried to send data to {Remote} but no session available", endPoint);
-            }
+
+            this.log.LogWarning("Tried to send data to {Remote} but no session available", endPoint);
         }
 
         /// <summary>
@@ -75,24 +77,25 @@
         /// <param name="endPoint">The endpoint who sent the packet.</param>
         internal void ReceivedUdpPacket(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
-            var session = this.cache.GetOrCreate(endPoint.ToString(), entry =>
+            var session = this.cache.GetOrAdd(endPoint.ToString(), entry =>
             {
                 entry.SlidingExpiration = config.SessionTimeout;
                 var callback = new PostEvictionCallbackRegistration()
                 {
                     EvictionCallback = OnEviction,
+                    State = this
                 };
                 entry.PostEvictionCallbacks.Add(callback);
 
                 var s = new DTLSSession(this.sender, new DTLSServer(this.dtlsServerConfig), endPoint, this.config);
                 s.DataReceived += DecryptedReceived;
                 s.HandshakeFinished += HandshakeFinished;
-                this.log.LogInformation("Start DTLS connection with {Remote}", endPoint);
+                this.log.LogDebug("Start DTLS connection with {Remote}", endPoint);
                 s.Start();
                 DTLSMetrics.Log.SessionAdded();
                 return s;
             });
-
+            this.log.LogTrace("Received {Bytes} encrypted Bytes from {Remote}", packet.Length, endPoint);
             session.Enqueue(packet);
         }
 
@@ -113,8 +116,9 @@
 
         private static void OnEviction(object key, object value, EvictionReason reason, object state)
         {
+            var manager = (DTLSSessionManager)state;
             var obj = value as DTLSSession;
-            LogManager.GetLogger<DTLSSessionManager>().LogDebug("Session with {Remote} timed out", obj.Remote);
+            manager.log.LogDebug("Session with {Remote} timed out", obj.Remote);
             DTLSMetrics.Log.SessionRemoved();
         }
     }

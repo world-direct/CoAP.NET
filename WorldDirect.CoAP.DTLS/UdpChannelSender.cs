@@ -2,6 +2,8 @@
 
 using System.Net;
 using Channel;
+using Log;
+using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// Represents a udp sender using a CoAP UDP channel.
@@ -9,6 +11,7 @@ using Channel;
 public class UdpChannelSender : IUDPSender
 {
     private readonly UDPChannel channel;
+    private readonly ILogger<UdpChannelSender> logger = LogManager.GetLogger<UdpChannelSender>();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UdpChannelSender"/> class.
@@ -22,6 +25,7 @@ public class UdpChannelSender : IUDPSender
     /// <inheritdoc />
     public void SendTo(ReadOnlySpan<byte> payload, EndPoint remote)
     {
+        this.logger.LogTrace("Sending {Bytes} encrypted bytes to {Remote}", payload.Length, remote);
         this.channel.Send(payload.ToArray(), remote);
     }
 }
