@@ -66,7 +66,7 @@ namespace WorldDirect.CoAP.Channel
 
             if (destination is IPEndPoint ep)
             {
-                log.LogDebug(message: $"Sending packet to {ep.Address.MapToIPv4()}:{ep.Port}. Processing package {(completedSynchronous ? "asynchronous" : "synchronous")}");
+                log.LogTrace(message: $"Sending packet to {ep.Address.MapToIPv4()}:{ep.Port}. Processing package {(completedSynchronous ? "asynchronous" : "synchronous")}");
             }
 
             if (completedSynchronous)

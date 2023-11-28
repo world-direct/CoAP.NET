@@ -497,7 +497,11 @@
                 };
             }
             TaskCompletionSource<Response> tcs = new TaskCompletionSource<Response>();
-            var cancellation = ct.Register(() => tcs.TrySetCanceled(ct));
+            var cancellation = ct.Register(() =>
+            {
+                tcs.TrySetCanceled(ct);
+                request.Cancel();
+            });
 
 
             Action<Response> success = (r) =>

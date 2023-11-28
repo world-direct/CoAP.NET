@@ -447,7 +447,7 @@ namespace WorldDirect.CoAP
                     payload += "... " + PayloadSize + " bytes";
             }
 
-            return String.Format("{0}-{1} ID={2}, Token={3}, Options=[{4}], {5}",
+            return String.Format("({0}-{1}) MessageID={2}, Token={3}, Options=[{4}], {5}",
                 Type, CoAP.Code.ToString(_code), ID, TokenString, Utils.OptionsToString(this), payload);
         }
 

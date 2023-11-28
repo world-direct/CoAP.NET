@@ -12,6 +12,7 @@
 namespace WorldDirect.CoAP.Stack
 {
     using System;
+    using System.Diagnostics;
     using System.Threading;
     using Log;
     using Microsoft.Extensions.Logging;
@@ -46,7 +47,6 @@ namespace WorldDirect.CoAP.Stack
 
             if (request.Type == MessageType.CON)
             {
-                    log.LogTrace("Scheduling retransmission for " + request);
                 PrepareRetransmission(exchange, request, ctx => SendRequest(nextLayer, exchange, request));
             }
 
@@ -230,8 +230,7 @@ namespace WorldDirect.CoAP.Stack
             {
                 ctx.CurrentTimeout = InitialTimeout(_config.AckTimeout, _config.AckRandomFactor);
             }
-
-                log.LogTrace("Send request, failed transmissions: " + ctx.FailedTransmissionCount);
+            log.LogDebug("Scheduling retransmission in {RetryIn}", TimeSpan.FromMilliseconds(ctx.CurrentTimeout));
 
             ctx.Start();
         }
@@ -250,9 +249,11 @@ namespace WorldDirect.CoAP.Stack
             private Int32 _failedTransmissionCount;
             private Timer _timer;
             private Action<TransmissionContext> _retransmit;
+            private ExecutionContext? _context;
 
             public TransmissionContext(ICoapConfig config, Exchange exchange, Message message, Action<TransmissionContext> retransmit)
             {
+                _context = ExecutionContext.Capture()?.CreateCopy();
                 _config = config;
                 _exchange = exchange;
                 _message = message;
@@ -307,6 +308,14 @@ namespace WorldDirect.CoAP.Stack
 
             void timer_Elapsed(object state)
             {
+                if(this._context != null)
+                    ExecutionContext.Run(this._context, this.OnExecutionContext, this);
+                else
+                    this.OnExecutionContext(state);
+            }
+
+            void OnExecutionContext(object _)
+            {
                 /*
 			     * Do not retransmit a message if it has been acknowledged,
 			     * rejected, canceled or already been retransmitted for the maximum
@@ -316,22 +325,22 @@ namespace WorldDirect.CoAP.Stack
 
                 if (_message.IsAcknowledged)
                 {
-                        log.LogTrace("Timeout: message already acknowledged, cancel retransmission of " + _message);
+                    log.LogTrace("Timeout: message already acknowledged, cancel retransmission of " + _message);
                     return;
                 }
                 else if (_message.IsRejected)
                 {
-                        log.LogTrace("Timeout: message already rejected, cancel retransmission of " + _message);
+                    log.LogTrace("Timeout: message already rejected, cancel retransmission of " + _message);
                     return;
                 }
                 else if (_message.IsCancelled)
                 {
-                        log.LogTrace("Timeout: canceled (ID=" + _message.ID + "), do not retransmit");
+                    log.LogTrace("Timeout: canceled (ID=" + _message.ID + "), do not retransmit");
                     return;
                 }
                 else if (failedCount <= (_message.MaxRetransmit != 0 ? _message.MaxRetransmit : _config.MaxRetransmit))
                 {
-                        log.LogTrace("Timeout: retransmit message, failed: " + failedCount + ", message: " + _message);
+                    log.LogDebug("Timeout: retransmit message for the {retry}. time.", failedCount);
 
                     _message.FireRetransmitting();
 
@@ -341,7 +350,7 @@ namespace WorldDirect.CoAP.Stack
                 }
                 else
                 {
-                        log.LogTrace("Timeout: retransmission limit reached, exchange failed, message: " + _message);
+                    log.LogDebug("Retransmission limit reached.");
                     _exchange.TimedOut = true;
                     _message.IsTimedOut = true;
                     _exchange.Remove(TransmissionContextKey);

@@ -14,6 +14,7 @@ namespace WorldDirect.CoAP.Deduplication
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Net;
     using System.Threading;
     using Log;
     using Microsoft.Extensions.Logging;
@@ -23,8 +24,9 @@ namespace WorldDirect.CoAP.Deduplication
     {
         static readonly ILogger<SweepDeduplicator> log = LogManager.GetLogger<SweepDeduplicator>();
 
-        private ConcurrentDictionary<Exchange.KeyID, Exchange> _incommingMessages
-            = new ConcurrentDictionary<Exchange.KeyID, Exchange>();
+        private ConcurrentDictionary<Exchange.KeyID, Exchange> _incomingMessages = new ConcurrentDictionary<Exchange.KeyID, Exchange>();
+        private ConcurrentDictionary<Exchange.KeyID, Exchange> _outgoingMessages = new ConcurrentDictionary<Exchange.KeyID, Exchange>();
+        
         private Timer _timer;
         private ICoapConfig _config;
 
@@ -35,15 +37,21 @@ namespace WorldDirect.CoAP.Deduplication
 
         private void Sweep(object state)
         {
-                log.LogDebug("Start Mark-And-Sweep with " + _incommingMessages.Count + " entries");
+            log.LogTrace("Start Mark-And-Sweep with " + (_incomingMessages.Count + _outgoingMessages.Count) + " entries");
 
+            this.Sweep(this._incomingMessages);
+            this.Sweep(this._outgoingMessages);
+        }
+
+        private void Sweep(ConcurrentDictionary<Exchange.KeyID, Exchange> dict)
+        {
             DateTime oldestAllowed = DateTime.Now.AddMilliseconds(-_config.ExchangeLifetime);
             List<Exchange.KeyID> keysToRemove = new List<Exchange.KeyID>();
-            foreach (KeyValuePair<Exchange.KeyID, Exchange> pair in _incommingMessages)
+            foreach (KeyValuePair<Exchange.KeyID, Exchange> pair in dict)
             {
                 if (pair.Value.Timestamp < oldestAllowed)
                 {
-                        log.LogDebug("Mark-And-Sweep removes " + pair.Key);
+                    log.LogTrace("Mark-And-Sweep removes " + pair.Key);
                     keysToRemove.Add(pair.Key);
                 }
             }
@@ -52,7 +60,7 @@ namespace WorldDirect.CoAP.Deduplication
                 Exchange ex;
                 foreach (Exchange.KeyID key in keysToRemove)
                 {
-                    _incommingMessages.TryRemove(key, out ex);
+                    dict.TryRemove(key, out ex);
                 }
             }
         }
@@ -73,18 +81,30 @@ namespace WorldDirect.CoAP.Deduplication
         /// <inheritdoc/>
         public void Clear()
         {
-            _incommingMessages.Clear();
+            _incomingMessages.Clear();
         }
 
         /// <inheritdoc/>
         public Exchange FindPrevious(Exchange.KeyID key, Exchange exchange)
         {
+
             Exchange prev = null;
-            _incommingMessages.AddOrUpdate(key, exchange, (k, v) =>
+            if (exchange.Origin == Origin.Local)
             {
-                prev = v;
-                return exchange;
-            });
+                _outgoingMessages.AddOrUpdate(key, exchange, (k, v) =>
+                {
+                    prev = v;
+                    return exchange;
+                });
+            }
+            else
+            {
+                _incomingMessages.AddOrUpdate(key, exchange, (k, v) =>
+                {
+                    prev = v;
+                    return exchange;
+                });
+            }
             return prev;
         }
 
@@ -92,7 +112,7 @@ namespace WorldDirect.CoAP.Deduplication
         public Exchange Find(Exchange.KeyID key)
         {
             Exchange prev;
-            _incommingMessages.TryGetValue(key, out prev);
+            _outgoingMessages.TryGetValue(key, out prev);
             return prev;
         }
 
