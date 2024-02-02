@@ -104,6 +104,10 @@ internal class DTLSSession
                 }
             }
         }
+        else
+        {
+            this.logger.LogTrace("Enqueued {Bytes} for decrypting. Skipped decrypting as handshake with {Remote} is not finished", payload.Length, this.Remote);
+        }
     }
 
     private void InvokeDataReceived(byte[] payload)

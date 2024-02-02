@@ -13,6 +13,7 @@ namespace WorldDirect.CoAP.Net
 {
     using System;
     using System.Net;
+    using System.Runtime.CompilerServices;
     using System.Runtime.Serialization;
     using System.Threading;
     using Channel;
@@ -22,7 +23,6 @@ namespace WorldDirect.CoAP.Net
     using Log;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
-    using Org.BouncyCastle.Tls;
     using Stack;
     using Threading;
 
@@ -245,6 +245,13 @@ namespace WorldDirect.CoAP.Net
 
                 request.Source = e.EndPoint;
 
+                using var scope = this.log.BeginScope(new List<KeyValuePair<string, object>>
+                {
+                    new ("MessageId", request.ID),
+                    new ("Remote", request.Source),
+                    new ("CoAPResource", request.URI.AbsolutePath),
+                });
+
                 Fire(ReceivingRequest, request);
 
                 if (!request.IsCancelled)
@@ -263,6 +270,12 @@ namespace WorldDirect.CoAP.Net
                 Response response = decoder.DecodeResponse();
                 response.Source = e.EndPoint;
 
+                using var scope = this.log.BeginScope(new List<KeyValuePair<string, object>>
+                {
+                    new ("MessageId", response.ID),
+                    new ("Remote", response.Source),
+                });
+
                 Fire(ReceivingResponse, response);
 
                 if (!response.IsCancelled)
@@ -270,6 +283,10 @@ namespace WorldDirect.CoAP.Net
                     Exchange exchange = _matcher.ReceiveResponse(response);
                     if (exchange != null)
                     {
+                        using var responseScope = this.log.BeginScope(new List<KeyValuePair<string, object>>
+                        {
+                            new ("CoAPResource", exchange.Request.URI.AbsolutePath),
+                        });
                         response.RTT = (DateTime.Now - exchange.Timestamp).TotalMilliseconds;
                         exchange.EndPoint = this;
                         this.ReceiveResponse(exchange, response);

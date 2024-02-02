@@ -7,14 +7,16 @@
 
     internal static class Tracing
     {
+        public static readonly string ClientActivityName = "WorldDirect.CoAP.Client";
+        public static readonly string ServerActivityName = "WorldDirect.CoAP.Server";
         /// <summary>
         /// The activity source for the tracing client events.
         /// </summary>
-        internal static readonly ActivitySource ClientSource = new ActivitySource("WorldDirect.CoAP.Client", "1.0.0");
+        internal static readonly ActivitySource ClientSource = new ActivitySource(ClientActivityName, "1.0.0");
 
         /// <summary>
         /// The activity source for the tracing events.
         /// </summary>
-        internal static readonly ActivitySource ServerSource = new ActivitySource("WorldDirect.CoAP.Server", "1.0.0");
+        internal static readonly ActivitySource ServerSource = new ActivitySource(ServerActivityName, "1.0.0");
     }
 }

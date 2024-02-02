@@ -52,7 +52,7 @@
         public void SendTo(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
             // cache.TryGetValue does not work (always returns false with null object...)
-            var session = this.cache.Get<DTLSSession>(endPoint.ToString());
+            var session = this.cache.Get<DTLSSession>(GetKey(endPoint));
             if (session != null)
             {
                 session.Send(packet);
@@ -77,7 +77,7 @@
         /// <param name="endPoint">The endpoint who sent the packet.</param>
         internal void ReceivedUdpPacket(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
-            var session = this.cache.GetOrAdd(endPoint.ToString(), entry =>
+            var session = this.cache.GetOrAdd(GetKey(endPoint), entry =>
             {
                 entry.SlidingExpiration = config.SessionTimeout;
                 var callback = new PostEvictionCallbackRegistration()
@@ -86,6 +86,7 @@
                     State = this
                 };
                 entry.PostEvictionCallbacks.Add(callback);
+                entry.Priority = CacheItemPriority.NeverRemove;
 
                 var s = new DTLSSession(this.sender, new DTLSServer(this.dtlsServerConfig), endPoint, this.config);
                 s.DataReceived += DecryptedReceived;
@@ -112,6 +113,11 @@
         private void DecryptedReceived(object? _, DTLSDataReceivedEventArgs e)
         {
             this.DataReceived?.Invoke(this, e);
+        }
+
+        private static string GetKey(EndPoint remote)
+        {
+            return $"dtlssession_{remote}";
         }
 
         private static void OnEviction(object key, object value, EvictionReason reason, object state)
