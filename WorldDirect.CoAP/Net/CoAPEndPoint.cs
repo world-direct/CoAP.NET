@@ -240,6 +240,7 @@ namespace WorldDirect.CoAP.Net
                 try
                 {
                     request = decoder.DecodeRequest();
+                    request.EndPoint = this;
                 }
                 catch (Exception)
                 {
