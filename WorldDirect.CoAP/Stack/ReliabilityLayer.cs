@@ -230,7 +230,7 @@ namespace WorldDirect.CoAP.Stack
             {
                 ctx.CurrentTimeout = InitialTimeout(_config.AckTimeout, _config.AckRandomFactor);
             }
-            log.LogDebug("Scheduling retransmission in {RetryIn}", TimeSpan.FromMilliseconds(ctx.CurrentTimeout));
+            log.LogTrace("Scheduling retransmission in {RetryIn}", TimeSpan.FromMilliseconds(ctx.CurrentTimeout));
 
             ctx.Start();
         }

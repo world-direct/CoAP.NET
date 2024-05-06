@@ -34,7 +34,7 @@ namespace WorldDirect.CoAP.Stack
             _maxMessageSize = config.MaxMessageSize;
             _defaultBlockSize = config.DefaultBlockSize;
             _blockTimeout = config.BlockwiseStatusLifetime;
-                log.LogDebug("BlockwiseLayer uses MaxMessageSize: " + _maxMessageSize + " and DefaultBlockSize:" + _defaultBlockSize);
+                log.LogInformation("BlockwiseLayer uses MaxMessageSize: " + _maxMessageSize + " and DefaultBlockSize:" + _defaultBlockSize);
 
             config.PropertyChanged += ConfigChanged;
         }
@@ -496,6 +496,8 @@ namespace WorldDirect.CoAP.Stack
             block.AddOption(new BlockOption(OptionType.Block1, num, szx, m));
             block.MaxRetransmit = request.MaxRetransmit;
             block.TimedOut += (s, a) => request.IsTimedOut = true;
+            // inform main message of a retransmission
+            block.Retransmitting += (s, a) => request.FireRetransmitting();
             status.Complete = !m;
             return block;
         }
