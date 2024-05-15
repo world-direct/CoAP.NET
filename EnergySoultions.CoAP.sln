@@ -23,9 +23,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WorldDirect.CoAP.Example.Se
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WorldDirect.CoAP.DTLS", "WorldDirect.CoAP.DTLS\WorldDirect.CoAP.DTLS.csproj", "{22366801-AB3F-4F99-AD26-80B6755F0709}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WorldDirect.CoAP.Server.Extensions", "WorldDirect.CoAP.Server.Extensions\WorldDirect.CoAP.Server.Extensions.csproj", "{7D124DB3-E5FF-40BC-BB80-213D5BB87F2F}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WorldDirect.CoAP.Server.Extensions.Specs", "WorldDirect.CoAP.Server.Extensions.Specs\WorldDirect.CoAP.Server.Extensions.Specs.csproj", "{C3D5BDEA-1B88-42F9-8C4B-61FCF0916808}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WorldDirect.CoAP.Hosting", "WorldDirect.CoAP.Hosting\WorldDirect.CoAP.Hosting.csproj", "{7D124DB3-E5FF-40BC-BB80-213D5BB87F2F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorldDirect.CoAPS.DTLS.Specs", "WorldDirect.CoAPS.DTLS.Specs\WorldDirect.CoAPS.DTLS.Specs.csproj", "{94ACFE1B-59C3-4E3F-BBB2-1682D440F103}"
 EndProject

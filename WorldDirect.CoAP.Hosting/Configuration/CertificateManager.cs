@@ -1,4 +1,4 @@
-﻿namespace WorldDirect.CoAP.Server.Extensions;
+﻿namespace WorldDirect.CoAP.Hosting.Configuration;
 
 using System.Security.Cryptography.X509Certificates;
 

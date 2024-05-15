@@ -1,6 +1,7 @@
-﻿namespace WorldDirect.CoAP.Server.Extensions.Configuration;
+﻿namespace WorldDirect.CoAP.Hosting.Configuration;
 
 using System.Globalization;
+using System.Net;
 
 /// <summary>
 /// An address a CoAP server may bind to.
@@ -18,6 +19,23 @@ public class BindingAddress
     public string Scheme { get; }
     public string Host { get; set; }
     public int Port { get; set; }
+
+    public static explicit operator IPEndPoint(BindingAddress d)
+    {
+        if (d.Host == "localhost")
+        {
+            return new IPEndPoint(IPAddress.Loopback, d.Port);
+        }
+        else
+        {
+            var ipAddress = IPAddress.Any;
+            if (IPAddress.TryParse(d.Host, out var parsedAddress))
+            {
+                ipAddress = parsedAddress;
+            }
+            return new IPEndPoint(ipAddress, d.Port);
+        }
+    }
 
     public static BindingAddress Parse(string address)
     {

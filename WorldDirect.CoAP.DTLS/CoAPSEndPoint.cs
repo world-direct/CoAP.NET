@@ -19,7 +19,6 @@ namespace WorldDirect.CoAP.Net
     using Channel;
     using Codec;
     using DTLS;
-    using LazyCache;
     using Log;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Logging;
@@ -61,7 +60,7 @@ namespace WorldDirect.CoAP.Net
         /// Instantiates a new endpoint with the
         /// specified channel and configuration.
         /// </summary>
-        public CoAPSEndpoint(IAppCache cache, DTLSServerConfig dtlsConfig, ICoapConfig config)
+        public CoAPSEndpoint(IMemoryCache cache, DTLSServerConfig dtlsConfig, ICoapConfig config)
         {
             _config = config;
             _matcher = new Matcher(this._config);
@@ -75,12 +74,26 @@ namespace WorldDirect.CoAP.Net
             this.DTLSConfig = dtlsConfig;
         }
 
-        public CoAPSEndpoint(IAppCache cache, DTLSServerConfig dtlsConfig, UDPChannel channel, ICoapConfig config)
+        public CoAPSEndpoint(IMemoryCache cache, DTLSServerConfig dtlsConfig, UDPChannel channel, ICoapConfig config)
         {
             _config = config;
             _matcher = new Matcher(this._config);
             _coapStack = new CoapStack(this._config);
             this.channel = new DTLSChannel(channel, cache, dtlsConfig);
+            this.channel.DtlsDataReceived += Channel_DataReceived;
+            this.DTLSConfig = dtlsConfig;
+        }
+
+        public CoAPSEndpoint(IMemoryCache cache, DTLSServerConfig dtlsConfig, IPEndPoint endpoint, ICoapConfig config)
+        {
+            _config = config;
+            _matcher = new Matcher(this._config);
+            _coapStack = new CoapStack(this._config);
+            var udpChannel = new UDPChannel(endpoint);
+
+            // DTLS Header has 9 bytes
+            udpChannel.ReceivePacketSize = config.MaxMessageSize + 9;
+            this.channel = new DTLSChannel(udpChannel, cache, dtlsConfig);
             this.channel.DtlsDataReceived += Channel_DataReceived;
             this.DTLSConfig = dtlsConfig;
         }

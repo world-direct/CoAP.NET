@@ -4,7 +4,6 @@
     using System.Net;
     using System.Text;
     using Channel;
-    using LazyCache;
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Internal;
     using Microsoft.Extensions.Logging;
@@ -18,7 +17,7 @@
     /// </summary>
     public class DTLSSessionManager
     {
-        private readonly IAppCache cache;
+        private readonly IMemoryCache cache;
         private readonly IUDPSender sender;
         private readonly DTLSServerConfig dtlsServerConfig;
         private readonly DTLSSessionConfig config;
@@ -31,7 +30,7 @@
         /// <param name="sender">An object to send udp packets.</param>
         /// <param name="dtlsServerConfig">The configuration of the dtls server.</param>
         /// <param name="config">The configuration for the sessions.</param>
-        public DTLSSessionManager(IAppCache cache, IUDPSender sender, DTLSServerConfig dtlsServerConfig, DTLSSessionConfig config)
+        public DTLSSessionManager(IMemoryCache cache, IUDPSender sender, DTLSServerConfig dtlsServerConfig, DTLSSessionConfig config)
         {
             this.cache = cache;
             this.sender = sender;
@@ -77,7 +76,7 @@
         /// <param name="endPoint">The endpoint who sent the packet.</param>
         internal void ReceivedUdpPacket(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
-            var session = this.cache.GetOrAdd(GetKey(endPoint), entry =>
+            var session = this.cache.GetOrCreate(GetKey(endPoint), entry =>
             {
                 entry.SlidingExpiration = config.SessionTimeout;
                 var callback = new PostEvictionCallbackRegistration()
