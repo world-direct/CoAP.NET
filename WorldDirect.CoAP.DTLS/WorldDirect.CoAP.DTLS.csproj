@@ -3,7 +3,7 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <Version>0.6.3-alpha34</Version>
+        <Version>0.6.3-alpha35</Version>
         <Company>World-Direct eBusiness solutions GmbH</Company>
         <Copyright>2023</Copyright>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
@@ -40,7 +40,7 @@
     </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.2.1" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.3.1" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="6.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
   </ItemGroup>
