@@ -7,11 +7,14 @@ using Org.BouncyCastle.Tls;
 /// <summary>
 /// Represents the udp package buffer of a DTLS connection.
 /// </summary>
-internal class UdpTransport : DatagramTransport
+internal class UdpTransport : DatagramTransport, IDisposable
 {
+    private bool disposed = false;
     private readonly IUDPSender sender;
     private readonly int maxPacketLength;
     private readonly BlockingCollection<byte[]> messages = new ();
+    private readonly TimeSpan timeout;
+    private DateTimeOffset lastReceivedDatagram;
 
     /// <summary>
     /// Initialize a new instance of the <see cref="UdpTransport"/> class.
@@ -19,11 +22,13 @@ internal class UdpTransport : DatagramTransport
     /// <param name="sender">The implementation of the udp </param>
     /// <param name="remote">The endpoint of the connection.</param>
     /// <param name="maxPacketLength">The maximum length of a dtls package.</param>
-    public UdpTransport(IUDPSender sender, EndPoint remote, int maxPacketLength)
+    /// <param name="timeout">The duration when the session is not valid anymore without a new datagram.</param>
+    public UdpTransport(IUDPSender sender, EndPoint remote, int maxPacketLength, TimeSpan timeout)
     {
         this.Remote = remote;
         this.sender = sender;
         this.maxPacketLength = maxPacketLength;
+        this.timeout = timeout;
     }
 
     /// <summary>
@@ -61,6 +66,13 @@ internal class UdpTransport : DatagramTransport
     /// <returns>The amount of received bytes.</returns>
     public int Receive(Span<byte> buffer, int waitMillis)
     {
+        if (this.disposed)
+        {
+            throw new ObjectDisposedException(nameof(UdpTransport));
+        }
+
+        this.CheckTimeout();
+
         if (this.messages.TryTake(out var rx, TimeSpan.FromMilliseconds(waitMillis)))
         {
             rx.CopyTo(buffer);
@@ -96,6 +108,11 @@ internal class UdpTransport : DatagramTransport
     /// <param name="buffer">The message to send.</param>
     public void Send(ReadOnlySpan<byte> buffer)
     {
+        if (this.disposed)
+        {
+            throw new ObjectDisposedException(nameof(UdpTransport));
+        }
+        this.CheckTimeout();
         this.sender.SendTo(buffer, this.Remote);
     }
 
@@ -104,7 +121,6 @@ internal class UdpTransport : DatagramTransport
     /// </summary>
     public void Close()
     {
-            
     }
 
     /// <summary>
@@ -113,6 +129,24 @@ internal class UdpTransport : DatagramTransport
     /// <param name="payload">The received message.</param>
     internal void Enqueue(ReadOnlySpan<byte> payload)
     {
+        if (this.disposed)
+        {
+            throw new ObjectDisposedException(nameof(UdpTransport));
+        }
         this.messages.Add(payload.ToArray());
+        this.lastReceivedDatagram = DateTimeOffset.Now;
+    }
+
+    public void Dispose()
+    {
+        this.disposed = true;
+    }
+
+    private void CheckTimeout()
+    {
+        if (DateTimeOffset.Now - this.lastReceivedDatagram > this.timeout)
+        {
+            throw new TlsTimeoutException("Did not receive a new package in time");
+        }
     }
 }

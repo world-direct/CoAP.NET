@@ -7,8 +7,10 @@
     using Microsoft.Extensions.Caching.Memory;
     using Microsoft.Extensions.Internal;
     using Microsoft.Extensions.Logging;
+    using Microsoft.Extensions.Logging.Abstractions;
     using Org.BouncyCastle.Asn1.Nist;
     using Org.BouncyCastle.Asn1.X509;
+    using Org.BouncyCastle.Tls;
     using Org.BouncyCastle.Tls.Crypto.Impl.BC;
     using WorldDirect.CoAP.Log;
 
@@ -36,6 +38,7 @@
             this.sender = sender;
             this.dtlsServerConfig = dtlsServerConfig;
             this.config = config;
+            this.log.LogDebug("Configured DTLS handshake timeout: {HandshakeTimeout}", dtlsServerConfig.HandshakeTimeout);
         }
 
         /// <summary>
@@ -76,27 +79,38 @@
         /// <param name="endPoint">The endpoint who sent the packet.</param>
         internal void ReceivedUdpPacket(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
-            var session = this.cache.GetOrCreate(GetKey(endPoint), entry =>
-            {
-                entry.SlidingExpiration = config.SessionTimeout;
-                var callback = new PostEvictionCallbackRegistration()
-                {
-                    EvictionCallback = OnEviction,
-                    State = this
-                };
-                entry.PostEvictionCallbacks.Add(callback);
-                entry.Priority = CacheItemPriority.NeverRemove;
+            var data = packet.ToArray();
+            short recordType = TlsUtilities.ReadUint8(data, 0);
+            int epoch = TlsUtilities.ReadUint16(data, 3);
+            short handshakeType = TlsUtilities.ReadUint8(data, 13);
+            DTLSSession? session = null;
 
-                var s = new DTLSSession(this.sender, new DTLSServer(this.dtlsServerConfig), endPoint, this.config);
-                s.DataReceived += DecryptedReceived;
-                s.HandshakeFinished += HandshakeFinished;
-                this.log.LogDebug("Start DTLS connection with {Remote}", endPoint);
-                s.Start();
-                DTLSMetrics.Log.SessionAdded();
-                return s;
-            });
-            this.log.LogTrace("Received {Bytes} encrypted Bytes from {Remote}", packet.Length, endPoint);
-            session.Enqueue(packet);
+            session = this.cache.Get<DTLSSession>(GetKey(endPoint));
+
+            if (session == null && (recordType == ContentType.handshake) && (epoch == 0) && (handshakeType == HandshakeType.client_hello))
+            {
+                session = this.cache.GetOrCreate(GetKey(endPoint), entry =>
+                {
+                    entry.SlidingExpiration = config.SessionTimeout;
+                    var callback = new PostEvictionCallbackRegistration() {EvictionCallback = OnEviction, State = this};
+                    entry.PostEvictionCallbacks.Add(callback);
+                    entry.Priority = CacheItemPriority.NeverRemove;
+
+                    var s = new DTLSSession(this.sender, new DTLSServer(this.dtlsServerConfig), endPoint, this.config);
+                    s.DataReceived += DecryptedReceived;
+                    s.HandshakeFinished += HandshakeFinished;
+                    this.log.LogDebug("Start DTLS connection with {Remote}", endPoint);
+                    s.Start();
+                    DTLSMetrics.Log.SessionAdded();
+                    return s;
+                });
+            }
+            
+            if (session != null)
+            {
+                this.log.LogTrace("Received {Bytes} encrypted Bytes from {Remote}", packet.Length, endPoint);
+                session.Enqueue(packet);
+            }
         }
 
         private void HandshakeFinished(object? sender, HandshakeFinishedEventArgs e)
@@ -123,6 +137,7 @@
         {
             var manager = (DTLSSessionManager)state;
             var obj = value as DTLSSession;
+            obj.Dispose();
             manager.log.LogDebug("Session with {Remote} timed out", obj.Remote);
             DTLSMetrics.Log.SessionRemoved();
         }

@@ -11,7 +11,7 @@ using Org.BouncyCastle.Tls;
 using WorldDirect.CoAP.Log;
 using WorldDirect.CoAP.Net;
 
-internal class DTLSSession
+internal class DTLSSession : IDisposable
 {
     private readonly DTLSSessionConfig config;
     private readonly UdpTransport transport;
@@ -24,7 +24,7 @@ internal class DTLSSession
     public DTLSSession(IUDPSender sender, DTLSServer server, EndPoint remote, DTLSSessionConfig config)
     {
         this.config = config;
-        this.transport = new UdpTransport(sender, remote, config.MaxPacketLength);
+        this.transport = new UdpTransport(sender, remote, config.MaxPacketLength, config.HandshakeTimeout);
         this.protocol = new DtlsServerProtocol();
         this.dtlsServer = server;
         this.logger = LogManager.GetLogger<DTLSSession>();
@@ -157,5 +157,10 @@ internal class DTLSSession
         {
             this.HandshakeFinished?.Invoke(this, new HandshakeFinishedEventArgs() { Successful = !this.HandshakeFailed });
         }
+    }
+
+    public void Dispose()
+    {
+        this.transport.Dispose();
     }
 }
