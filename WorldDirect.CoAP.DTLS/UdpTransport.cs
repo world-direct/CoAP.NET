@@ -29,6 +29,7 @@ internal class UdpTransport : DatagramTransport, IDisposable
         this.sender = sender;
         this.maxPacketLength = maxPacketLength;
         this.timeout = timeout;
+        this.lastReceivedDatagram = DateTimeOffset.Now;
     }
 
     /// <summary>
