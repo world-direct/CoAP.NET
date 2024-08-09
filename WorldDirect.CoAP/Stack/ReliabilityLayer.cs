@@ -161,6 +161,12 @@ namespace WorldDirect.CoAP.Stack
         /// </summary>
         public override void ReceiveResponse(INextLayer nextLayer, Exchange exchange, Response response)
         {
+            if (response.Duplicate)
+            {
+                log.LogTrace("Response is duplicate, ignore it.");
+                return;
+            }
+
             TransmissionContext ctx = (TransmissionContext)exchange.Remove(TransmissionContextKey);
             if (ctx != null)
             {
@@ -175,14 +181,7 @@ namespace WorldDirect.CoAP.Stack
                 SendEmptyMessage(nextLayer, exchange, ack);
             }
 
-            if (response.Duplicate)
-            {
-                    log.LogTrace("Response is duplicate, ignore it.");
-            }
-            else
-            {
-                base.ReceiveResponse(nextLayer, exchange, response);
-            }
+            base.ReceiveResponse(nextLayer, exchange, response);
         }
 
         /// <summary>
