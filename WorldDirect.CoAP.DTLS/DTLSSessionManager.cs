@@ -54,13 +54,19 @@
         public void SendTo(ReadOnlySpan<byte> packet, EndPoint endPoint)
         {
             // cache.TryGetValue does not work (always returns false with null object...)
-            var session = this.cache.Get<DTLSSession>(GetKey(endPoint));
-            if (session != null)
+            try
             {
-                session.Send(packet);
-                return;
+                var session = this.cache.Get<DTLSSession>(GetKey(endPoint));
+                if (session != null)
+                {
+                    session.Send(packet);
+                    return;
+                }
             }
-
+            catch (ObjectDisposedException)
+            {
+                // might happen because eviction happens after getting object but before sending is called
+            }
             this.log.LogWarning("Tried to send data to {Remote} but no session available", endPoint);
         }
 

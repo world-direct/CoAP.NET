@@ -85,8 +85,15 @@
         /// <inheritdoc />
         public void Send(byte[] data, EndPoint ep)
         {
-            this.logger.LogTrace("Sending {Bytes} decrypted bytes to {Remote}", data.Length, ep);
-            this.sessionManager.SendTo(data, ep);
+            try
+            {
+                this.logger.LogTrace("Sending {Bytes} decrypted bytes to {Remote}", data.Length, ep);
+                this.sessionManager.SendTo(data, ep);
+            }
+            catch (Exception e)
+            {
+                this.logger.LogError(e, "Could not send data to {Remote}", ep);
+            }
         }
 
         private void DecryptedForwarding(object? sender, DTLSDataReceivedEventArgs e)
