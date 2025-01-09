@@ -66,8 +66,6 @@ namespace WorldDirect.CoAP.Net
             _matcher = new Matcher(this._config);
             _coapStack = new CoapStack(this._config);
             UDPChannel channel = new UDPChannel(new IPEndPoint(IPAddress.Any, 5684));
-            channel.ReceiveBufferSize = this._config.ChannelReceiveBufferSize;
-            channel.SendBufferSize = this._config.ChannelSendBufferSize;
             channel.ReceivePacketSize = this._config.ChannelReceivePacketSize;
             this.channel = new DTLSChannel(channel, cache, dtlsConfig);
             this.channel.DtlsDataReceived += Channel_DataReceived;
@@ -90,9 +88,7 @@ namespace WorldDirect.CoAP.Net
             _matcher = new Matcher(this._config);
             _coapStack = new CoapStack(this._config);
             var udpChannel = new UDPChannel(endpoint);
-
-            // DTLS Header has 9 bytes
-            udpChannel.ReceivePacketSize = config.MaxMessageSize + 9;
+            udpChannel.ReceivePacketSize = this._config.ChannelReceivePacketSize;
             this.channel = new DTLSChannel(udpChannel, cache, dtlsConfig);
             this.channel.DtlsDataReceived += Channel_DataReceived;
             this.DTLSConfig = dtlsConfig;

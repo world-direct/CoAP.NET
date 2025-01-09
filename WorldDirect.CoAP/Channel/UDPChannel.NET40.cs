@@ -78,15 +78,23 @@ namespace WorldDirect.CoAP.Channel
         private void ProcessReceive(SocketAsyncEventArgs e, bool requeue)
         {
             UDPSocket socket = (UDPSocket)e.UserToken;
-
             if (e.SocketError == SocketError.Success)
             {
+                if(e.BytesTransferred > this.ReceivePacketSizeToReport)
+                {
+                    var base64Payload = Convert.ToBase64String(e.Buffer.AsSpan().Slice(e.Offset, e.BytesTransferred));
+                    log.LogWarning("Received a message greater than expected from {Remote}: {Payload}", e.RemoteEndPoint, base64Payload);
+                }
                 EndReceive(socket, e.Buffer, e.Offset, e.BytesTransferred, e.RemoteEndPoint);
             }
             else if (e.SocketError != SocketError.OperationAborted
                 && e.SocketError != SocketError.Interrupted)
             {
-                throw new SocketException((Int32)e.SocketError);
+                if(e.SocketError != SocketError.MessageSize)
+                {
+                    throw new SocketException((Int32)e.SocketError);
+                }
+                log.LogError(new SocketException((Int32)e.SocketError), "A udp message greater {BufferSize} was received", e.Buffer.Length);
             }
 
             if (requeue)

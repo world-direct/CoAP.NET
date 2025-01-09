@@ -111,6 +111,12 @@ namespace WorldDirect.CoAP.Channel
             set { _receivePacketSize = value; }
         }
 
+        /// <summary>
+        /// Gets or sets the packet size that should be reported and logged to investigate how large messages are created.
+        /// The default value is 1500.
+        /// </summary>
+        public Int32 ReceivePacketSizeToReport { get; set; } = 1500;
+
         /// <inheritdoc/>
         public void Start()
         {
