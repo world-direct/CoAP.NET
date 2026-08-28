@@ -17,6 +17,7 @@ namespace WorldDirect.CoAP.Channel
     using System.Net.Sockets;
     using System.Threading;
     using Log;
+    using Microsoft.Extensions.Logging;
 
     /// <summary>
     /// Channel via UDP protocol.
@@ -24,7 +25,7 @@ namespace WorldDirect.CoAP.Channel
     public partial class UDPChannel : IChannel
     {
 
-        static readonly ILogger log = LogManager.GetLogger(typeof(UDPChannel));
+        private readonly ILogger<UDPChannel> log = LogManager.GetLogger<UDPChannel>();
 
         /// <summary>
         /// Default size of buffer for receiving packet.
@@ -109,6 +110,12 @@ namespace WorldDirect.CoAP.Channel
             get { return _receivePacketSize; }
             set { _receivePacketSize = value; }
         }
+
+        /// <summary>
+        /// Gets or sets the packet size that should be reported and logged to investigate how large messages are created.
+        /// The default value is 1500.
+        /// </summary>
+        public Int32 ReceivePacketSizeToReport { get; set; } = 1500;
 
         /// <inheritdoc/>
         public void Start()
@@ -239,6 +246,7 @@ namespace WorldDirect.CoAP.Channel
         {
             if (count > 0)
             {
+                Metrics.Log.BytesReceived(count);
                 Byte[] bytes = new Byte[count];
                 Buffer.BlockCopy(buffer, 0, bytes, 0, count);
 
@@ -252,13 +260,13 @@ namespace WorldDirect.CoAP.Channel
                 try
                 {
                     DateTimeOffset start = DateTimeOffset.Now;
-                    log.Info($"UDP-FireDataReceived START");
+                    log.LogTrace($"UDP-FireDataReceived START");
                     FireDataReceived(bytes, ep);
-                    log.Info($"UDP-FireDataReceived END ({DateTimeOffset.Now - start})");
+                    log.LogTrace("UDP-FireDataReceived END ({Duration})", DateTimeOffset.Now - start);
                 }
                 catch (Exception e)
                 {
-                    log.Error($"FireDataReceived error occurred: {e.ToString()}", e);
+                    log.LogError($"FireDataReceived error occurred: {e.ToString()}", e);
                 }
             }
         }
@@ -309,6 +317,7 @@ namespace WorldDirect.CoAP.Channel
                     }
                 }
 
+                Metrics.Log.BytesTransmitted(raw.Data.Length);
                 BeginSend(socket, raw.Data, remoteEndPoint);
 
             } while (messageDequeued);

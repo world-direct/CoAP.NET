@@ -2,9 +2,11 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Threading;
     using System.Threading.Tasks;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
 
     /// <summary>
@@ -15,7 +17,7 @@
         #region Locals
 
         private static readonly IEnumerable<WebLink> EmptyLinks = new WebLink[0];
-        private static ILogger log = LogManager.GetLogger(typeof(CoapClient));
+        private static ILogger<CoapClient> log = LogManager.GetLogger<CoapClient>();
 
         private ICoapConfig _config;
         private IEndPoint _endpoint;
@@ -458,23 +460,54 @@
             return Prepare(request).Send().WaitForResponse(_timeout);
         }
 
-        public void SendAsync(Request request, Action<Response> done, Action<FailReason> fail = null)
+        private void SendAsync(Request request, Action<Response> done, Action<FailReason> fail = null)
         {
             request.Respond += (o, e) => Deliver(done, e);
             request.Rejected += (o, e) => Fail(fail, FailReason.Rejected);
             request.TimedOut += (o, e) => Fail(fail, FailReason.TimedOut);
 
-            Prepare(request).Send();
+            request.Send();
         }
 
         public Task<Response> SendAsync(Request request, CancellationToken ct)
         {
+            request = Prepare(request);
+            var activity = Tracing.ClientSource.StartActivity("CoAP Request");
+            activity?.AddTag("coap.method", request.Method);
+            activity?.AddTag("coap.uri", request.URI);
+            activity?.AddTag("coap.resource", request.UriPath);
+            activity?.AddTag("coap.remote", request.Destination);
+            if (activity != null)
+            {
+                request.Retransmitting += (o, ev) =>
+                {
+                    activity.AddEvent(new ActivityEvent("Retransmitting"));
+                };
+                request.Responding += (obj, ev) =>
+                {
+                    var response = ev.Response;
+                    if (response.Block1 != null)
+                    {
+                        activity.AddEvent(new ActivityEvent($"New Block {ev.Response.Block1?.NUM}"));
+                    }
+                    else if (response.Block2 != null)
+                    {
+                        activity.AddEvent(new ActivityEvent($"New Block {ev.Response.Block2?.NUM}"));
+                    }
+                };
+            }
             TaskCompletionSource<Response> tcs = new TaskCompletionSource<Response>();
-            var cancellation = ct.Register(() => tcs.TrySetCanceled(ct));
+            var cancellation = ct.Register(() =>
+            {
+                tcs.TrySetCanceled(ct);
+                request.Cancel();
+            });
 
 
             Action<Response> success = (r) =>
             {
+                activity?.AddTag("coap.statuscode", r.StatusCode);
+                activity?.Stop();
                 tcs.TrySetResult(r);
                 cancellation.Dispose();
             };
@@ -485,11 +518,13 @@
 
                 if (fr == FailReason.TimedOut)
                 {
+                    activity?.AddTag("coap.statuscode", "TIMEOUT");
                     exception = new TimeoutException();
                 }
 
                 else if (fr == FailReason.Rejected)
                 {
+                    activity?.AddTag("coap.statuscode", "REJECTED");
                     exception = new InvalidOperationException("The request has been rejected.");
                 }
 
@@ -498,6 +533,7 @@
                     exception = new InvalidOperationException($"The request failed with the reason {fr}");
                 }
 
+                activity?.Stop();
                 tcs.TrySetException(exception);
                 cancellation.Dispose();
             };
@@ -587,8 +623,7 @@
                     }
                     else
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Dropping old notification: " + resp);
+                        log.LogDebug("Dropping old notification: " + resp);
                     }
                 }
             };

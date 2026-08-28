@@ -62,7 +62,7 @@ namespace WorldDirect.CoAP
         private Int32 _notificationReregistrationBackoff = 2000; // ms
         private Int32 _channelReceiveBufferSize;
         private Int32 _channelSendBufferSize;
-        private Int32 _channelReceivePacketSize = 2048;
+        private Int32 _channelReceivePacketSize = 4096;
 
         /// <summary>
         /// Instantiate.

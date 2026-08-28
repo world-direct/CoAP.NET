@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+      <Version>1.0.0-alpha.3</Version>
+      <Company>World-Direct eBusiness solutions GmbH</Company>
+      <Copyright>2023</Copyright>
+      <PackageLicenseFile>LICENSE</PackageLicenseFile>
+      <PackageIcon>packageIcon.png</PackageIcon>
+      <RepositoryUrl>https://github.com/world-direct/CoAP.NET</RepositoryUrl>
+      <Description>
+        Changelog:
+        v0.6.3: add tracing diagnostics
+        v0.6.2: add ssl keyfile for extraction of session keys
+        v0.6.1: adapt to easier configuration of dtls
+      </Description>
+  </PropertyGroup>
+
+    <PropertyGroup>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    </PropertyGroup>
+    <ItemGroup>
+        <None Include="..\.nuget\icon.png" Link="icon.png">
+            <PackagePath></PackagePath>
+            <Pack>True</Pack>
+        </None>
+        <None Include="..\LICENSE" Link="LICENSE">
+            <PackagePath></PackagePath>
+            <Pack>True</Pack>
+        </None>
+        <None Include="..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath></PackagePath>
+        </None>
+        <None Include="..\packageIcon.png">
+            <Pack>True</Pack>
+            <PackagePath></PackagePath>
+        </None>
+    </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
+    <PackageReference Include="OpenTelemetry.Api" Version="1.18.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WorldDirect.CoAP.DTLS\WorldDirect.CoAP.DTLS.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Hosting\Services\" />
+  </ItemGroup>
+
+</Project>

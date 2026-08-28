@@ -17,6 +17,7 @@ namespace WorldDirect.CoAP
     using System.Text.RegularExpressions;
     using EndPoint.Resources;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Server.Resources;
     using Util;
     using Resource = EndPoint.Resources.Resource;
@@ -75,7 +76,7 @@ namespace WorldDirect.CoAP
         static readonly Regex EqualRegex = new Regex("=");
         static readonly Regex BlankRegex = new Regex("\\s");
 
-        private static ILogger log = LogManager.GetLogger(typeof(LinkFormat));
+        private static ILogger log = LogManager.GetLogger();
 
         public static String Serialize(IResource root)
         {
@@ -469,8 +470,7 @@ namespace WorldDirect.CoAP
                 {
                     if (attr.Name.Equals(attrToAdd.Name))
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Found existing singleton attribute: " + attr.Name);
+                            log?.LogDebug("Found existing singleton attribute: " + attr.Name);
                         return false;
                     }
                 }

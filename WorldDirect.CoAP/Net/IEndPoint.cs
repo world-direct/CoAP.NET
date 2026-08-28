@@ -40,6 +40,10 @@ namespace WorldDirect.CoAP.Net
         /// </summary>
         IOutbox Outbox { get; }
         /// <summary>
+        /// Gets the scheme.
+        /// </summary>
+        string Scheme { get; }
+        /// <summary>
         /// Occurs when a request is about to be sent.
         /// </summary>
         event EventHandler<MessageEventArgs<Request>> SendingRequest;

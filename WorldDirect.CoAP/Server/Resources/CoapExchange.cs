@@ -12,6 +12,7 @@
 namespace WorldDirect.CoAP.Server.Resources
 {
     using System;
+    using System.Diagnostics;
     using Net;
 
     /// <summary>
@@ -23,6 +24,7 @@ namespace WorldDirect.CoAP.Server.Resources
     {
         readonly Exchange _exchange;
         readonly Resource _resource;
+        private Activity activity;
 
         private String _locationPath;
         private String _locationQuery;
@@ -37,6 +39,19 @@ namespace WorldDirect.CoAP.Server.Resources
         {
             _exchange = exchange;
             _resource = resource;
+            Activity.Current = null;
+            var request = exchange.Request;
+            this.activity = Tracing.ServerSource.CreateActivity($"CoAP {request.UriPath}", ActivityKind.Server);
+            this.activity?.Start();
+            this.activity?.AddTag("coap.method", request.Method);
+            this.activity?.AddTag("coap.uri", request.URI);
+            this.activity?.AddTag("coap.resource", request.UriPath);
+            this.activity?.AddTag("coap.remote", request.Source);
+        }
+
+        public T Get<T>(Object key)
+        {
+            return this._exchange.Get<T>(key);
         }
 
         /// <summary>
@@ -175,8 +190,11 @@ namespace WorldDirect.CoAP.Server.Resources
                 response.SetOption(Option.Create(OptionType.ETag, _eTag));
 
             _resource.CheckObserveRelation(_exchange, response);
-
+            
             _exchange.SendResponse(response);
+            this.activity?.AddTag("coap.statuscode", response.StatusCode);
+            this.activity?.Stop();
+            this.activity = null;
         }
     }
 }

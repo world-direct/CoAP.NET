@@ -15,6 +15,7 @@ namespace WorldDirect.CoAP.Server.Resources
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
     using Observe;
     using Threading;
@@ -26,7 +27,7 @@ namespace WorldDirect.CoAP.Server.Resources
     public class Resource : IResource
     {
         static readonly IEnumerable<IEndPoint> EmptyEndPoints = new IEndPoint[0];
-        static readonly ILogger log = LogManager.GetLogger(typeof(Resource));
+        static readonly ILogger<Resource> log = LogManager.GetLogger<Resource>();
         readonly ResourceAttributes _attributes = new ResourceAttributes();
         private String _name;
         private String _path = String.Empty;
@@ -278,13 +279,11 @@ namespace WorldDirect.CoAP.Server.Resources
             if (old != null)
             {
                 old.Cancel();
-                if (log.IsDebugEnabled)
-                    log.Debug("Replacing observe relation between " + relation.Key + " and resource " + Uri);
+                    log.LogDebug("Replacing observe relation between " + relation.Key + " and resource " + Uri);
             }
             else
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Successfully established observe relation between " + relation.Key + " and resource " + Uri);
+                    log.LogDebug("Successfully established observe relation between " + relation.Key + " and resource " + Uri);
             }
         }
 

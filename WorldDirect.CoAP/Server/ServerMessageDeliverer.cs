@@ -13,7 +13,9 @@ namespace WorldDirect.CoAP.Server
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
     using Observe;
     using Resources;
@@ -26,7 +28,7 @@ namespace WorldDirect.CoAP.Server
     /// </summary>
     public class ServerMessageDeliverer : IMessageDeliverer
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(ServerMessageDeliverer));
+        static readonly ILogger<ServerMessageDeliverer> log = LogManager.GetLogger<ServerMessageDeliverer>();
         readonly ICoapConfig _config;
         readonly IResource _root;
         readonly ObserveManager _observeManager = new ObserveManager();
@@ -44,7 +46,10 @@ namespace WorldDirect.CoAP.Server
         /// <inheritdoc/>
         public void DeliverRequest(Exchange exchange)
         {
+            Activity.Current = null;
+
             Request request = exchange.Request;
+            
             IResource resource = FindResource(request.UriPaths);
             if (resource != null)
             {
@@ -56,6 +61,7 @@ namespace WorldDirect.CoAP.Server
                     executor.Start(() => resource.HandleRequest(exchange));
                 else
                     resource.HandleRequest(exchange);
+
             }
             else
             {
@@ -101,8 +107,7 @@ namespace WorldDirect.CoAP.Server
                 if (obs == 0)
                 {
                     // Requests wants to observe and resource allows it :-)
-                    if (log.IsDebugEnabled)
-                        log.Debug("Initiate an observe relation between " + source + " and resource " + resource.Uri);
+                        log.LogDebug("Initiate an observe relation between " + source + " and resource " + resource.Uri);
                     ObservingEndpoint remote = _observeManager.FindObservingEndpoint(source);
                     ObserveRelation relation = new ObserveRelation(_config, remote, resource, exchange);
                     remote.AddObserveRelation(relation);

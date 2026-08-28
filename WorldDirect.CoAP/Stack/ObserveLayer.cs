@@ -14,12 +14,13 @@ namespace WorldDirect.CoAP.Stack
     using System;
     using System.Threading;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
     using Observe;
 
     public class ObserveLayer : AbstractLayer
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(ObserveLayer));
+        static readonly ILogger<ObserveLayer> log = LogManager.GetLogger<ObserveLayer>();
         static readonly Object ReregistrationContextKey = "ReregistrationContext";
 
         /// <summary>
@@ -46,8 +47,7 @@ namespace WorldDirect.CoAP.Stack
                     // Transmit errors as CON
                     if (!Code.IsSuccess(response.Code))
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Response has error code " + response.Code + " and must be sent as CON");
+                            log.LogTrace("Response has error code " + response.Code + " and must be sent as CON");
                         response.Type = MessageType.CON;
                         relation.Cancel();
                     }
@@ -56,8 +56,7 @@ namespace WorldDirect.CoAP.Stack
                         // Make sure that every now and than a CON is mixed within
                         if (relation.Check())
                         {
-                            if (log.IsDebugEnabled)
-                                log.Debug("The observe relation check requires the notification to be sent as CON");
+                                log.LogTrace("The observe relation check requires the notification to be sent as CON");
                             response.Type = MessageType.CON;
                         }
                         else
@@ -103,8 +102,7 @@ namespace WorldDirect.CoAP.Stack
                     Response current = relation.CurrentControlNotification;
                     if (current != null && IsInTransit(current))
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("A former notification is still in transit. Postpone " + response);
+                            log.LogTrace("A former notification is still in transit. Postpone " + response);
                         // use the same ID
                         response.ID = current.ID;
                         relation.NextControlNotification = response;
@@ -129,8 +127,7 @@ namespace WorldDirect.CoAP.Stack
                 if (exchange.Request.IsCancelled)
                 {
                     // The request was canceled and we no longer want notifications
-                    if (log.IsDebugEnabled)
-                        log.Debug("ObserveLayer rejecting notification for canceled Exchange");
+                        log.LogTrace("ObserveLayer rejecting notification for canceled Exchange");
                     EmptyMessage rst = EmptyMessage.NewRST(response);
                     SendEmptyMessage(nextLayer, exchange, rst);
                     // Matcher sets exchange as complete when RST is sent
@@ -144,8 +141,7 @@ namespace WorldDirect.CoAP.Stack
                     //  - "ReregistrationContext" takes into consideration the wrong request
                     // This seems to be a bug
 
-                    if (log.IsDebugEnabled)
-                        log.Debug("Reregistration not supported");
+                        log.LogTrace("Reregistration not supported");
 
                     //PrepareReregistration(exchange, response, msg => SendRequest(nextLayer, exchange, msg));
 
@@ -197,8 +193,7 @@ namespace WorldDirect.CoAP.Stack
                     relation.NextControlNotification = null;
                     if (next != null)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Notification has been acknowledged, send the next one");
+                            log.LogTrace("Notification has been acknowledged, send the next one");
                         // this is not a self replacement, hence a new ID
                         next.ID = Message.None;
                         // Create a new task for sending next response so that we can leave the sync-block
@@ -215,8 +210,7 @@ namespace WorldDirect.CoAP.Stack
                     Response next = relation.NextControlNotification;
                     if (next != null)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("The notification has timed out and there is a fresher notification for the retransmission.");
+                            log.LogTrace("The notification has timed out and there is a fresher notification for the retransmission.");
                         // Cancel the original retransmission and send the fresh notification here
                         response.IsCancelled = true;
                         // use the same ID
@@ -238,8 +232,7 @@ namespace WorldDirect.CoAP.Stack
             response.TimedOut += (o, e) =>
             {
                 ObserveRelation relation = exchange.Relation;
-                if (log.IsDebugEnabled)
-                    log.Debug("Notification" + relation.Exchange.Request.TokenString
+                    log.LogTrace("Notification" + relation.Exchange.Request.TokenString
                         + " timed out. Cancel all relations with source " + relation.Source);
                 relation.CancelAll();
             };
@@ -251,8 +244,7 @@ namespace WorldDirect.CoAP.Stack
             ReregistrationContext ctx = exchange.GetOrAdd<ReregistrationContext>(
                 ReregistrationContextKey, _ => new ReregistrationContext(exchange, timeout, reregister));
 
-            if (log.IsDebugEnabled)
-                log.Debug("Scheduling re-registration in " + timeout + "ms for " + exchange.Request);
+                log.LogTrace("Scheduling re-registration in " + timeout + "ms for " + exchange.Request);
 
             ctx.Restart();
         }
@@ -306,15 +298,13 @@ namespace WorldDirect.CoAP.Stack
                     refresh.Token = request.Token;
                     refresh.Destination = request.Destination;
                     refresh.CopyEventHandler(request);
-                    if (log.IsDebugEnabled)
-                        log.Debug("Re-registering for " + request);
+                        log.LogTrace("Re-registering for " + request);
                     request.FireReregister(refresh);
                     _reregister(refresh);
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Dropping re-registration for canceled " + request);
+                        log.LogTrace("Dropping re-registration for canceled " + request);
                 }
             }
         }

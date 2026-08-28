@@ -13,6 +13,7 @@ namespace WorldDirect.CoAP.Net
 {
     using System;
     using System.Collections.Concurrent;
+    using System.Diagnostics;
     using Observe;
     using Stack;
     using Util;
@@ -270,7 +271,14 @@ namespace WorldDirect.CoAP.Net
             {
                 _id = id;
                 _endpoint = ep;
-                _hash = id * 31 + (ep == null ? 0 : ep.GetHashCode());
+                if (ep == null)
+                {
+                    _hash = id * 31;
+                }
+                else
+                {
+                    _hash = HashCode.Combine(id, _endpoint);
+                }
             }
 
             /// <inheritdoc/>

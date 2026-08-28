@@ -15,6 +15,7 @@ namespace WorldDirect.CoAP.Server
     using System.Collections.Generic;
     using System.Net;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
     using Resources;
 
@@ -23,7 +24,7 @@ namespace WorldDirect.CoAP.Server
     /// </summary>
     public class CoapServer : IServer
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(CoapServer));
+        static readonly ILogger<CoapServer> log = LogManager.GetLogger<CoapServer>();
         readonly IResource _root;
         readonly List<IEndPoint> _endpoints = new List<IEndPoint>();
         readonly ICoapConfig _config;
@@ -162,8 +163,7 @@ namespace WorldDirect.CoAP.Server
         /// <inheritdoc/>
         public void Start()
         {
-            if (log.IsDebugEnabled)
-                log.Debug("Starting CoAP server");
+                log.LogDebug("Starting CoAP server");
             
             if (_endpoints.Count == 0)
             {
@@ -180,8 +180,7 @@ namespace WorldDirect.CoAP.Server
                 }
                 catch (Exception e)
                 {
-                    if (log.IsWarnEnabled)
-                        log.Warn("Could not start endpoint " + endpoint.LocalEndPoint, e);
+                        log.LogWarning("Could not start endpoint " + endpoint.LocalEndPoint, e);
                 }
             }
 
@@ -192,8 +191,7 @@ namespace WorldDirect.CoAP.Server
         /// <inheritdoc/>
         public void Stop()
         {
-            if (log.IsDebugEnabled)
-                log.Debug("Starting CoAP server");
+                log.LogDebug("Starting CoAP server");
             _endpoints.ForEach(ep => ep.Stop());
         }
 

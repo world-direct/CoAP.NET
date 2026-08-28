@@ -1,10 +1,10 @@
 ﻿/*
  * Copyright (c) 2011-2015, Longxiang He <helongxiang@smeshlink.com>,
  * SmeshLink Technology Co.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY.
- * 
+ *
  * This file is part of the CoAP.NET, a CoAP framework in C#.
  * Please see README for more information.
  */
@@ -14,14 +14,16 @@ namespace WorldDirect.CoAP.Net
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using Deduplication;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Observe;
     using Util;
 
-    class Matcher : IMatcher, IDisposable
+    public class Matcher : IMatcher, IDisposable
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(Matcher));
+        static readonly ILogger<Matcher> log = LogManager.GetLogger<Matcher>();
 
         /// <summary>
         /// for all
@@ -39,14 +41,15 @@ namespace WorldDirect.CoAP.Net
         readonly ConcurrentDictionary<Exchange.KeyUri, Exchange> _ongoingExchanges
             = new ConcurrentDictionary<Exchange.KeyUri, Exchange>();
         private Int32 _running;
-        private Int32 _currentID;
+        private readonly MessageIdProvider currentIdProvider;
         private IDeduplicator _deduplicator;
 
         public Matcher(ICoapConfig config)
         {
             _deduplicator = DeduplicatorFactory.CreateDeduplicator(config);
-            if (config.UseRandomIDStart)
-                _currentID = new Random().Next(1 << 16);
+            this.currentIdProvider = new MessageIdProvider(config);
+            //if (config.UseRandomIDStart)
+                //_currentID = new Random().Next(1 << 16);
         }
 
         /// <inheritdoc/>
@@ -55,6 +58,7 @@ namespace WorldDirect.CoAP.Net
             if (System.Threading.Interlocked.CompareExchange(ref _running, 1, 0) > 0)
                 return;
             _deduplicator.Start();
+            this.currentIdProvider.Start();
         }
 
         /// <inheritdoc/>
@@ -63,6 +67,7 @@ namespace WorldDirect.CoAP.Net
             if (System.Threading.Interlocked.Exchange(ref _running, 0) == 0)
                 return;
             _deduplicator.Stop();
+            this.currentIdProvider.Stop();
             Clear();
         }
 
@@ -79,8 +84,9 @@ namespace WorldDirect.CoAP.Net
         public void SendRequest(Exchange exchange, Request request)
         {
             if (request.ID == Message.None)
-                request.ID = System.Threading.Interlocked.Increment(ref _currentID) % (1 << 16);
+                request.ID = this.currentIdProvider.Get(request.Destination);
 
+            log.LogTrace("Send request with {MessageId} to {Remote}", request.ID, request.Destination);
             /*
              * The request is a CON or NON and must be prepared for these responses
              * - CON => ACK / RST / ACK+response / CON+response / NON+response
@@ -89,13 +95,12 @@ namespace WorldDirect.CoAP.Net
              */
 
             // the MID is from the local namespace -- use blank address
-            Exchange.KeyID keyID = new Exchange.KeyID(request.ID, null);
+            Exchange.KeyID keyID = new Exchange.KeyID(request.ID, request.Destination);
             Exchange.KeyToken keyToken = new Exchange.KeyToken(request.Token);
 
             exchange.Completed += OnExchangeCompleted;
 
-            if (log.IsDebugEnabled)
-                log.Debug("Stored open request by " + keyID + ", " + keyToken);
+                log.LogTrace("Stored open request by " + keyID + ", " + keyToken);
 
             _exchangesByID[keyID] = exchange;
             _exchangesByToken[keyToken] = exchange;
@@ -105,14 +110,15 @@ namespace WorldDirect.CoAP.Net
         public void SendResponse(Exchange exchange, Response response)
         {
             if (response.ID == Message.None)
-                response.ID = System.Threading.Interlocked.Increment(ref _currentID) % (1 << 16);
+                response.ID = this.currentIdProvider.Get(exchange.Request.Source);
 
+            log.LogTrace("Send response with {MessageId} to {Remote}", response.ID, response.Destination);
             /*
              * The response is a CON or NON or ACK and must be prepared for these
              * - CON => ACK / RST // we only care to stop retransmission
              * - NON => RST // we only care for observe
              * - ACK => nothing!
-             * If this response goes lost, we must be prepared to get the same 
+             * If this response goes lost, we must be prepared to get the same
              * CON/NON request with same MID again. We then find the corresponding
              * exchange and the ReliabilityLayer resends this response.
              */
@@ -138,19 +144,16 @@ namespace WorldDirect.CoAP.Net
                     // Remember ongoing blockwise GET requests
                     if (Utils.Put(_ongoingExchanges, keyUri, exchange) == null)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Ongoing Block2 started late, storing " + keyUri + " for " + request);
+                            log.LogDebug("Ongoing Block2 started late, storing " + keyUri + " for " + request);
                     }
                     else
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Ongoing Block2 continued, storing " + keyUri + " for " + request);
+                            log.LogDebug("Ongoing Block2 continued, storing " + keyUri + " for " + request);
                     }
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Ongoing Block2 completed, cleaning up " + keyUri + " for " + request);
+                        log.LogDebug("Ongoing Block2 completed, cleaning up " + keyUri + " for " + request);
                     Exchange exc;
                     _ongoingExchanges.TryRemove(keyUri, out exc);
                 }
@@ -188,7 +191,7 @@ namespace WorldDirect.CoAP.Net
 		     * This request could be
 		     *  - Complete origin request => deliver with new exchange
 		     *  - One origin block        => deliver with ongoing exchange
-		     *  - Complete duplicate request or one duplicate block (because client got no ACK) 
+		     *  - Complete duplicate request or one duplicate block (because client got no ACK)
 		     *      =>
 		     * 		if ACK got lost => resend ACK
 		     * 		if ACK+response got lost => resend ACK+response
@@ -197,6 +200,7 @@ namespace WorldDirect.CoAP.Net
 		     */
 
             Exchange.KeyID keyId = new Exchange.KeyID(request.ID, request.Source);
+            log.LogTrace("Received request with {MessageId} from {Remote}", request.ID, request.Source);
 
             /*
              * The differentiation between the case where there is a Block1 or
@@ -215,8 +219,7 @@ namespace WorldDirect.CoAP.Net
                 }
                 else
                 {
-                    if (log.IsInfoEnabled)
-                        log.Info("Duplicate request: " + request);
+                    log.LogWarning("Duplicate request: {MessageId} from {Remote}. The cached response is replayed, the request is not processed again. A peer reusing a message id within EXCHANGE_LIFETIME violates RFC 7252 section 4.4.", request.ID, request.Source);
                     request.Duplicate = true;
                     return previous;
                 }
@@ -225,8 +228,7 @@ namespace WorldDirect.CoAP.Net
             {
                 Exchange.KeyUri keyUri = new Exchange.KeyUri(request.URI, request.Source);
 
-                if (log.IsDebugEnabled)
-                    log.Debug("Looking up ongoing exchange for " + keyUri);
+                    log.LogDebug("Looking up ongoing exchange for " + keyUri);
 
                 Exchange ongoing;
                 if (_ongoingExchanges.TryGetValue(keyUri, out ongoing))
@@ -234,8 +236,7 @@ namespace WorldDirect.CoAP.Net
                     Exchange prev = _deduplicator.FindPrevious(keyId, ongoing);
                     if (prev != null)
                     {
-                        if (log.IsInfoEnabled)
-                            log.Info("Duplicate ongoing request: " + request);
+                            log.LogInformation("Duplicate ongoing request: " + request);
                         request.Duplicate = true;
                     }
                     else
@@ -244,8 +245,7 @@ namespace WorldDirect.CoAP.Net
                         if (ongoing.CurrentResponse.Type != MessageType.ACK && !ongoing.CurrentResponse.HasOption(OptionType.Observe))
                         {
                             keyId = new Exchange.KeyID(ongoing.CurrentResponse.ID, null);
-                            if (log.IsDebugEnabled)
-                                log.Debug("Ongoing exchange got new request, cleaning up " + keyId);
+                                log.LogDebug("Ongoing exchange got new request, cleaning up " + keyId);
                             _exchangesByID.Remove(keyId);
                         }
                     }
@@ -253,7 +253,7 @@ namespace WorldDirect.CoAP.Net
                 }
                 else
                 {
-                    // We have no ongoing exchange for that request block. 
+                    // We have no ongoing exchange for that request block.
                     /*
                      * Note the difficulty of the following code: The first message
                      * of a blockwise transfer might arrive twice due to a
@@ -266,16 +266,14 @@ namespace WorldDirect.CoAP.Net
                     Exchange previous = _deduplicator.FindPrevious(keyId, exchange);
                     if (previous == null)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("New ongoing request, storing " + keyUri + " for " + request);
+                            log.LogDebug("New ongoing request, storing " + keyUri + " for " + request);
                         exchange.Completed += OnExchangeCompleted;
                         _ongoingExchanges[keyUri] = exchange;
                         return exchange;
                     }
                     else
                     {
-                        if (log.IsInfoEnabled)
-                            log.Info("Duplicate initial request: " + request);
+                            log.LogInformation("Duplicate initial request: " + request);
                         request.Duplicate = true;
                         return previous;
                     }
@@ -293,14 +291,8 @@ namespace WorldDirect.CoAP.Net
 		     * 		=> resend ACK
 		     */
 
-            Exchange.KeyID keyId;
-            if (response.Type == MessageType.ACK)
-                // own namespace
-                keyId = new Exchange.KeyID(response.ID, null);
-            else
-                // remote namespace
-                keyId = new Exchange.KeyID(response.ID, response.Source);
-
+            Exchange.KeyID keyId = new Exchange.KeyID(response.ID, response.Source);
+            log.LogTrace("Received response with {MessageId} from {Remote}", response.ID, response.Source);
             Exchange.KeyToken keyToken = new Exchange.KeyToken(response.Token);
 
             Exchange exchange;
@@ -311,23 +303,20 @@ namespace WorldDirect.CoAP.Net
                 if (prev != null)
                 {
                     // (and thus it holds: prev == exchange)
-                    if (log.IsInfoEnabled)
-                        log.Info("Duplicate response for open exchange: " + response);
+                    log.LogDebug("Duplicate response for open exchange: {response} from {Remote}. Started request at {RequestTimestamp}", response, response.Source, exchange.Timestamp);
                     response.Duplicate = true;
                 }
                 else
                 {
-                    keyId = new Exchange.KeyID(exchange.CurrentRequest.ID, null);
-                    if (log.IsDebugEnabled)
-                        log.Debug("Exchange got response: Cleaning up " + keyId);
+                    keyId = new Exchange.KeyID(exchange.CurrentRequest.ID, response.Source);
+                        log.LogTrace("Exchange got response: Cleaning up " + keyId);
                     _exchangesByID.Remove(keyId);
                 }
 
                 if (response.Type == MessageType.ACK && exchange.CurrentRequest.ID != response.ID)
                 {
                     // The token matches but not the MID. This is a response for an older exchange
-                    if (log.IsWarnEnabled)
-                        log.Warn("Possible MID reuse before lifetime end: " + response.TokenString + " expected MID " + exchange.CurrentRequest.ID + " but received " + response.ID);
+                        log.LogWarning("Possible MID reuse before lifetime end: " + response.TokenString + " expected MID " + exchange.CurrentRequest.ID + " but received " + response.ID);
                 }
 
                 return exchange;
@@ -341,16 +330,14 @@ namespace WorldDirect.CoAP.Net
                     Exchange prev = _deduplicator.Find(keyId);
                     if (prev != null)
                     {
-                        if (log.IsInfoEnabled)
-                            log.Info("Duplicate response for completed exchange: " + response);
+                        log.LogInformation("Duplicate response for completed exchange: " + response);
                         response.Duplicate = true;
                         return prev;
                     }
                 }
                 else
                 {
-                    if (log.IsInfoEnabled)
-                        log.Info("Ignoring unmatchable piggy-backed response from " + response.Source + ": " + response);
+                        log.LogTrace("Ignoring unmatchable piggy-backed response from " + response.Source + ": " + response);
                 }
                 // ignore response
                 return null;
@@ -365,15 +352,13 @@ namespace WorldDirect.CoAP.Net
             Exchange exchange;
             if (_exchangesByID.TryGetValue(keyID, out exchange))
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Exchange got reply: Cleaning up " + keyID);
+                    log.LogDebug("Exchange got reply: Cleaning up " + keyID);
                 _exchangesByID.Remove(keyID);
                 return exchange;
             }
             else
             {
-                if (log.IsInfoEnabled)
-                    log.Info("Ignoring unmatchable empty message from " + message.Source + ": " + message);
+                    log.LogInformation("Ignoring unmatchable empty message from " + message.Source + ": " + message);
                 return null;
             }
         }
@@ -384,12 +369,12 @@ namespace WorldDirect.CoAP.Net
             IDisposable d = _deduplicator as IDisposable;
             if (d != null)
                 d.Dispose();
+            this.currentIdProvider.Dispose();
         }
 
         private void RemoveNotificatoinsOf(ObserveRelation relation)
         {
-            if (log.IsDebugEnabled)
-                log.Debug("Remove all remaining NON-notifications of observe relation");
+                log.LogDebug("Remove all remaining NON-notifications of observe relation");
 
             foreach (Response previous in relation.ClearNotifications())
             {
@@ -403,7 +388,7 @@ namespace WorldDirect.CoAP.Net
         {
             Exchange exchange = (Exchange)sender;
 
-            /* 
+            /*
 			 * Logging in this method leads to significant performance loss.
 			 * Uncomment logging code only for debugging purposes.
 			 */
@@ -411,11 +396,10 @@ namespace WorldDirect.CoAP.Net
             if (exchange.Origin == Origin.Local)
             {
                 // this endpoint created the Exchange by issuing a request
-                Exchange.KeyID keyID = new Exchange.KeyID(exchange.CurrentRequest.ID, null);
+                Exchange.KeyID keyID = new Exchange.KeyID(exchange.CurrentRequest.ID, exchange.Request.Destination);
                 Exchange.KeyToken keyToken = new Exchange.KeyToken(exchange.CurrentRequest.Token);
 
-                if (log.IsDebugEnabled)
-                    log.Debug("Exchange completed: Cleaning up " + keyToken);
+                log.LogTrace("Exchange completed: Cleaning up " + keyToken);
 
                 _exchangesByToken.Remove(keyToken);
                 // in case an empty ACK was lost
@@ -439,8 +423,7 @@ namespace WorldDirect.CoAP.Net
                 if (request != null && (request.HasOption(OptionType.Block1) || response != null && response.HasOption(OptionType.Block2)))
                 {
                     Exchange.KeyUri uriKey = new Exchange.KeyUri(request.URI, request.Source);
-                    if (log.IsDebugEnabled)
-                        log.Debug("Remote ongoing completed, cleaning up " + uriKey);
+                        log.LogDebug("Remote ongoing completed, cleaning up " + uriKey);
                     Exchange exc;
                     _ongoingExchanges.TryRemove(uriKey, out exc);
                 }

@@ -15,11 +15,12 @@ namespace WorldDirect.CoAP.Stack
     using System.Linq;
     using System.Threading;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
 
     public class BlockwiseLayer : AbstractLayer
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(BlockwiseLayer));
+        static readonly ILogger<BlockwiseLayer> log = LogManager.GetLogger<BlockwiseLayer>();
 
         private Int32 _maxMessageSize;
         private Int32 _defaultBlockSize;
@@ -33,8 +34,7 @@ namespace WorldDirect.CoAP.Stack
             _maxMessageSize = config.MaxMessageSize;
             _defaultBlockSize = config.DefaultBlockSize;
             _blockTimeout = config.BlockwiseStatusLifetime;
-            if (log.IsDebugEnabled)
-                log.Debug("BlockwiseLayer uses MaxMessageSize: " + _maxMessageSize + " and DefaultBlockSize:" + _defaultBlockSize);
+                log.LogInformation("BlockwiseLayer uses MaxMessageSize: " + _maxMessageSize + " and DefaultBlockSize:" + _defaultBlockSize);
 
             config.PropertyChanged += ConfigChanged;
         }
@@ -60,8 +60,7 @@ namespace WorldDirect.CoAP.Stack
                 // Note: We do not regard it as random access when the block num is
                 // 0. This is because the user might just want to do early block
                 // size negotiation but actually wants to receive all blocks.
-                if (log.IsDebugEnabled)
-                    log.Debug("Request carries explicit defined block2 option: create random access blockwise status");
+                    log.LogTrace("Request carries explicit defined block2 option: create random access blockwise status");
                 BlockwiseStatus status = new BlockwiseStatus(request.ContentFormat);
                 BlockOption block2 = request.Block2;
                 status.CurrentSZX = block2.SZX;
@@ -73,8 +72,7 @@ namespace WorldDirect.CoAP.Stack
             else if (RequiresBlockwise(request))
             {
                 // This must be a large POST or PUT request
-                if (log.IsDebugEnabled)
-                    log.Debug("Request payload " + request.PayloadSize + "/" + _maxMessageSize + " requires Blockwise.");
+                    log.LogTrace("Request payload " + request.PayloadSize + "/" + _maxMessageSize + " requires Blockwise.");
                 BlockwiseStatus status = FindRequestBlockStatus(exchange, request);
                 Request block = GetNextRequestBlock(request, status);
                 exchange.RequestBlockStatus = status;
@@ -95,15 +93,13 @@ namespace WorldDirect.CoAP.Stack
             {
                 // This must be a large POST or PUT request
                 BlockOption block1 = request.Block1;
-                if (log.IsDebugEnabled)
-                    log.Debug("Request contains block1 option " + block1);
+                    log.LogTrace("Request contains block1 option " + block1);
 
                 BlockwiseStatus status = FindRequestBlockStatus(exchange, request);
                 if (block1.NUM == 0 && status.CurrentNUM > 0)
                 {
                     // reset the blockwise transfer
-                    if (log.IsDebugEnabled)
-                        log.Debug("Block1 num is 0, the client has restarted the blockwise transfer. Reset status.");
+                        log.LogTrace("Block1 num is 0, the client has restarted the blockwise transfer. Reset status.");
                     status = new BlockwiseStatus(request.ContentType);
                     exchange.RequestBlockStatus = status;
                 }
@@ -128,8 +124,7 @@ namespace WorldDirect.CoAP.Stack
                     status.CurrentNUM = status.CurrentNUM + 1;
                     if (block1.M)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("There are more blocks to come. Acknowledge this block.");
+                            log.LogTrace("There are more blocks to come. Acknowledge this block.");
 
                         Response piggybacked = Response.CreateResponse(request, StatusCode.Continue);
                         piggybacked.AddOption(new BlockOption(OptionType.Block1, block1.NUM, block1.SZX, true));
@@ -142,8 +137,7 @@ namespace WorldDirect.CoAP.Stack
                     }
                     else
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("This was the last block. Deliver request");
+                            log.LogTrace("This was the last block. Deliver request");
 
                         // Remember block to acknowledge. TODO: We might make this a boolean flag in status.
                         exchange.Block1ToAck = block1;
@@ -162,8 +156,7 @@ namespace WorldDirect.CoAP.Stack
                 else
                 {
                     // ERROR, wrong number, Incomplete
-                    if (log.IsWarnEnabled)
-                        log.Warn("Wrong block number. Expected " + status.CurrentNUM + " but received " + block1.NUM + ". Respond with 4.08 (Request Entity Incomplete).");
+                        log.LogWarning("Wrong block number. Expected " + status.CurrentNUM + " but received " + block1.NUM + ". Respond with 4.08 (Request Entity Incomplete).");
                     Response error = Response.CreateResponse(request, StatusCode.RequestEntityIncomplete);
                     error.AddOption(new BlockOption(OptionType.Block1, block1.NUM, block1.SZX, block1.M));
                     error.SetPayload("Wrong block number");
@@ -188,15 +181,13 @@ namespace WorldDirect.CoAP.Stack
                 if (status.Complete)
                 {
                     // clean up blockwise status
-                    if (log.IsDebugEnabled)
-                        log.Debug("Ongoing is complete " + status);
+                        log.LogTrace("Ongoing is complete " + status);
                     exchange.ResponseBlockStatus = null;
                     ClearBlockCleanup(exchange);
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Ongoing is continuing " + status);
+                        log.LogTrace("Ongoing is continuing " + status);
                 }
 
                 exchange.CurrentResponse = block;
@@ -221,8 +212,7 @@ namespace WorldDirect.CoAP.Stack
 
             if (RequiresBlockwise(exchange, response))
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Response payload " + response.PayloadSize + "/" + _maxMessageSize + " requires Blockwise");
+                    log.LogTrace("Response payload " + response.PayloadSize + "/" + _maxMessageSize + " requires Blockwise");
 
                 BlockwiseStatus status = FindResponseBlockStatus(exchange, response);
 
@@ -236,15 +226,13 @@ namespace WorldDirect.CoAP.Stack
                 if (status.Complete)
                 {
                     // clean up blockwise status
-                    if (log.IsDebugEnabled)
-                        log.Debug("Ongoing finished on first block " + status);
+                        log.LogTrace("Ongoing finished on first block " + status);
                     exchange.ResponseBlockStatus = null;
                     ClearBlockCleanup(exchange);
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Ongoing started " + status);
+                        log.LogTrace("Ongoing started " + status);
                 }
 
                 exchange.CurrentResponse = block;
@@ -254,6 +242,7 @@ namespace WorldDirect.CoAP.Stack
             {
                 if (block1 != null)
                     response.SetOption(block1);
+                exchange.Request.Response = response;
                 exchange.CurrentResponse = response;
                 // Block1 transfer completed
                 ClearBlockCleanup(exchange);
@@ -265,9 +254,9 @@ namespace WorldDirect.CoAP.Stack
         public override void ReceiveResponse(INextLayer nextLayer, Exchange exchange, Response response)
         {
 
-            log.Debug($"Transition of response through {this.GetType()}");
-            log.Debug($"Response-Length: {response?.Bytes?.Length}");
-            log.Debug($"Response-Options: {string.Join(" ", response?.GetOptions()?.Select(o => o.ToString())?.ToArray())}");
+            log.LogTrace($"Transition of response through {this.GetType()}");
+            log.LogTrace($"Response-Length: {response?.Bytes?.Length}");
+            log.LogTrace($"Response-Options: {string.Join(" ", response?.GetOptions()?.Select(o => o.ToString())?.ToArray())}");
 
             // do not continue fetching blocks if canceled
             if (exchange.Request.IsCancelled)
@@ -275,8 +264,7 @@ namespace WorldDirect.CoAP.Stack
                 // reject (in particular for Block+Observe)
                 if (response.Type != MessageType.ACK)
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Rejecting blockwise transfer for canceled Exchange");
+                        log.LogTrace("Rejecting blockwise transfer for canceled Exchange");
                     EmptyMessage rst = EmptyMessage.NewRST(response);
                     SendEmptyMessage(nextLayer, exchange, rst);
                     // Matcher sets exchange as complete when RST is sent
@@ -296,8 +284,7 @@ namespace WorldDirect.CoAP.Stack
             if (block1 != null)
             {
                 // TODO: What if request has not been sent blockwise (server error)
-                if (log.IsDebugEnabled)
-                    log.Debug("Response acknowledges block " + block1);
+                    log.LogTrace("Response acknowledges block " + block1);
 
                 BlockwiseStatus status = exchange.RequestBlockStatus;
                 if (!status.Complete)
@@ -311,8 +298,7 @@ namespace WorldDirect.CoAP.Stack
                     // Send next block
                     Int32 currentSize = 1 << (4 + status.CurrentSZX);
                     Int32 nextNum = status.CurrentNUM + currentSize / block1.Size;
-                    if (log.IsDebugEnabled)
-                        log.Debug("Send next block num = " + nextNum);
+                        log.LogTrace("Send next block num = " + nextNum);
                     status.CurrentNUM = nextNum;
                     status.CurrentSZX = block1.SZX;
                     Request nextBlock = GetNextRequestBlock(exchange.Request, status);
@@ -334,8 +320,7 @@ namespace WorldDirect.CoAP.Stack
                 }
                 else
                 {
-                    if (log.IsDebugEnabled)
-                        log.Debug("Response has Block2 option and is therefore sent blockwise");
+                        log.LogTrace("Response has Block2 option and is therefore sent blockwise");
                 }
             }
 
@@ -363,8 +348,7 @@ namespace WorldDirect.CoAP.Stack
                     }
                     else if (block2.M)
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("Request the next response block");
+                            log.LogTrace("Request the next response block");
 
                         Request request = exchange.Request;
                         Int32 num = block2.NUM + 1;
@@ -389,8 +373,7 @@ namespace WorldDirect.CoAP.Stack
                     }
                     else
                     {
-                        if (log.IsDebugEnabled)
-                            log.Debug("We have received all " + status.BlockCount + " blocks of the response. Assemble and deliver.");
+                            log.LogTrace("We have received all " + status.BlockCount + " blocks of the response. Assemble and deliver.");
                         Response assembled = new Response(response.StatusCode);
                         AssembleMessage(status, assembled, response);
                         assembled.Type = response.Type;
@@ -408,8 +391,7 @@ namespace WorldDirect.CoAP.Stack
                             exchange.ResponseBlockStatus = null;
                         }
 
-                        if (log.IsDebugEnabled)
-                            log.Debug("Assembled response: " + assembled);
+                            log.LogTrace("Assembled response: " + assembled);
                         exchange.Response = assembled;
                         base.ReceiveResponse(nextLayer, exchange, assembled);
                     }
@@ -420,8 +402,7 @@ namespace WorldDirect.CoAP.Stack
                     // ERROR, wrong block number (server error)
                     // TODO: This scenario is not specified in the draft.
                     // Currently, we reject it and cancel the request.
-                    if (log.IsWarnEnabled)
-                        log.Warn("Wrong block number. Expected " + status.CurrentNUM + " but received " + block2.NUM + ". Reject response; exchange has failed.");
+                        log.LogTrace("Wrong block number. Expected " + status.CurrentNUM + " but received " + block2.NUM + ". Reject response; exchange has failed.");
                     if (response.Type == MessageType.CON)
                     {
                         EmptyMessage rst = EmptyMessage.NewRST(response);
@@ -440,8 +421,7 @@ namespace WorldDirect.CoAP.Stack
             {
                 BlockOption block2 = request.Block2;
                 BlockwiseStatus status2 = new BlockwiseStatus(request.ContentType, block2.NUM, block2.SZX);
-                if (log.IsDebugEnabled)
-                    log.Debug("Request with early block negotiation " + block2 + ". Create and set new Block2 status: " + status2);
+                    log.LogTrace("Request with early block negotiation " + block2 + ". Create and set new Block2 status: " + status2);
                 exchange.ResponseBlockStatus = status2;
             }
         }
@@ -459,13 +439,11 @@ namespace WorldDirect.CoAP.Stack
                 status = new BlockwiseStatus(request.ContentType);
                 status.CurrentSZX = BlockOption.EncodeSZX(_defaultBlockSize);
                 exchange.RequestBlockStatus = status;
-                if (log.IsDebugEnabled)
-                    log.Debug("There is no assembler status yet. Create and set new Block1 status: " + status);
+                    log.LogTrace("There is no assembler status yet. Create and set new Block1 status: " + status);
             }
             else
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Current Block1 status: " + status);
+                    log.LogTrace("Current Block1 status: " + status);
             }
             // sets a timeout to complete exchange
             PrepareBlockCleanup(exchange);
@@ -485,13 +463,11 @@ namespace WorldDirect.CoAP.Stack
                 status = new BlockwiseStatus(response.ContentType);
                 status.CurrentSZX = BlockOption.EncodeSZX(_defaultBlockSize);
                 exchange.ResponseBlockStatus = status;
-                if (log.IsDebugEnabled)
-                    log.Debug("There is no blockwise status yet. Create and set new Block2 status: " + status);
+                    log.LogTrace("There is no blockwise status yet. Create and set new Block2 status: " + status);
             }
             else
             {
-                if (log.IsDebugEnabled)
-                    log.Debug("Current Block2 status: " + status);
+                    log.LogTrace("Current Block2 status: " + status);
             }
             // sets a timeout to complete exchange
             PrepareBlockCleanup(exchange);
@@ -520,6 +496,8 @@ namespace WorldDirect.CoAP.Stack
             block.AddOption(new BlockOption(OptionType.Block1, num, szx, m));
             block.MaxRetransmit = request.MaxRetransmit;
             block.TimedOut += (s, a) => request.IsTimedOut = true;
+            // inform main message of a retransmission
+            block.Retransmitting += (s, a) => request.FireRetransmitting();
             status.Complete = !m;
             return block;
         }
@@ -664,13 +642,11 @@ namespace WorldDirect.CoAP.Stack
         {
             if (exchange.Request == null)
             {
-                if (log.IsInfoEnabled)
-                    log.Info("Block1 transfer timed out: " + exchange.CurrentRequest);
+                    log.LogTrace("Block1 transfer timed out: " + exchange.CurrentRequest);
             }
             else
             {
-                if (log.IsInfoEnabled)
-                    log.Info("Block2 transfer timed out: " + exchange.Request);
+                    log.LogTrace("Block2 transfer timed out: " + exchange.Request);
             }
             exchange.Complete = true;
         }

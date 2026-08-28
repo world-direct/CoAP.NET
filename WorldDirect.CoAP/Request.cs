@@ -95,7 +95,7 @@ namespace WorldDirect.CoAP
                 if (_uri == null)
                 {
                     UriBuilder ub = new UriBuilder();
-                    ub.Scheme = CoapConstants.UriScheme;
+                    ub.Scheme = this.EndPoint.Scheme;
                     ub.Host = UriHost ?? "localhost";
                     ub.Port = UriPort;
                     ub.Path = UriPath;

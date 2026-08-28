@@ -15,6 +15,7 @@ namespace WorldDirect.CoAP.Observe
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using Log;
+    using Microsoft.Extensions.Logging;
     using Net;
     using Server.Resources;
     using Util;
@@ -24,7 +25,7 @@ namespace WorldDirect.CoAP.Observe
     /// </summary>
     public class ObserveRelation
     {
-        static readonly ILogger log = LogManager.GetLogger(typeof(ObserveRelation));
+        static readonly ILogger<ObserveRelation> log = LogManager.GetLogger<ObserveRelation>();
         readonly ICoapConfig _config;
         readonly ObservingEndpoint _endpoint;
         readonly IResource _resource;
@@ -120,8 +121,7 @@ namespace WorldDirect.CoAP.Observe
         /// </summary>
         public void Cancel()
         {
-            if (log.IsDebugEnabled)
-                log.Debug("Cancel observe relation from " + _key + " with " + _resource.Path);
+                log.LogDebug("Cancel observe relation from " + _key + " with " + _resource.Path);
             // stop ongoing retransmissions
             if (_exchange.Response != null)
                 _exchange.Response.Cancel();
