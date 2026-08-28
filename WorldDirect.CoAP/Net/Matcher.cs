@@ -219,7 +219,7 @@ namespace WorldDirect.CoAP.Net
                 }
                 else
                 {
-                        log.LogDebug("Duplicate request: {MessageId} from {Remote}", request.ID, request.Source);
+                    log.LogWarning("Duplicate request: {MessageId} from {Remote}. The cached response is replayed, the request is not processed again. A peer reusing a message id within EXCHANGE_LIFETIME violates RFC 7252 section 4.4.", request.ID, request.Source);
                     request.Duplicate = true;
                     return previous;
                 }
