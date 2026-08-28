@@ -1,10 +1,10 @@
 ﻿/*
  * Copyright (c) 2011-2015, Longxiang He <helongxiang@smeshlink.com>,
  * SmeshLink Technology Co.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY.
- * 
+ *
  * This file is part of the CoAP.NET, a CoAP framework in C#.
  * Please see README for more information.
  */
@@ -118,7 +118,7 @@ namespace WorldDirect.CoAP.Net
              * - CON => ACK / RST // we only care to stop retransmission
              * - NON => RST // we only care for observe
              * - ACK => nothing!
-             * If this response goes lost, we must be prepared to get the same 
+             * If this response goes lost, we must be prepared to get the same
              * CON/NON request with same MID again. We then find the corresponding
              * exchange and the ReliabilityLayer resends this response.
              */
@@ -191,7 +191,7 @@ namespace WorldDirect.CoAP.Net
 		     * This request could be
 		     *  - Complete origin request => deliver with new exchange
 		     *  - One origin block        => deliver with ongoing exchange
-		     *  - Complete duplicate request or one duplicate block (because client got no ACK) 
+		     *  - Complete duplicate request or one duplicate block (because client got no ACK)
 		     *      =>
 		     * 		if ACK got lost => resend ACK
 		     * 		if ACK+response got lost => resend ACK+response
@@ -253,7 +253,7 @@ namespace WorldDirect.CoAP.Net
                 }
                 else
                 {
-                    // We have no ongoing exchange for that request block. 
+                    // We have no ongoing exchange for that request block.
                     /*
                      * Note the difficulty of the following code: The first message
                      * of a blockwise transfer might arrive twice due to a
@@ -388,7 +388,7 @@ namespace WorldDirect.CoAP.Net
         {
             Exchange exchange = (Exchange)sender;
 
-            /* 
+            /*
 			 * Logging in this method leads to significant performance loss.
 			 * Uncomment logging code only for debugging purposes.
 			 */
