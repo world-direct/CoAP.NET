@@ -182,3 +182,4 @@ CoAP.NET is based on [**Californium**] (https://github.com/mkovatsc/Californium)
 a CoAP framework in Java by Matthias Kovatsch, Dominique Im Obersteg,
 and Daniel Pauli, ETH Zurich. See <http://people.inf.ethz.ch/mkovatsc/californium.php>.
 Thanks to the authors and their great job.
+
