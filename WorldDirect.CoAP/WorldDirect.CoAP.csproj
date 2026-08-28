@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>1.0.0-alpha.3</Version>
+    <Version>1.0.0-alpha.4</Version>
     <Company>World-Direct eBusiness solutions GmbH</Company>
     <Copyright>2021</Copyright>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
